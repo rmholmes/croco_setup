@@ -2,7 +2,7 @@
 #
 # Setup directory structure for a new clean configuration
 
-name='Benguela_LR'
+name='Benguela_VHR'
 
 cd ~/croco
 
@@ -23,7 +23,7 @@ cp jobcomp $name/
 cd $name
 mkdir /scratch/e14/rmh561/croco/$name
 ln -s /scratch/e14/rmh561/croco/$name rundir
-mkdir rundir/OUT
-mkdir rundir/FRC
+mkdir rundir/OUTPUT
+mkdir rundir/INPUT
 mkdir rundir/Compile
-mkdir rundir/INI
+

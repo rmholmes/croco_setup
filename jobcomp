@@ -39,7 +39,10 @@ echo "OPERATING SYSTEM IS: $OS"
 #
 # compiler options
 #
-FC=gfortran
+FC=ifort
+CC=icc
+F90=ifort
+F77=ifort
 
 #
 # set MPI directories if needed
