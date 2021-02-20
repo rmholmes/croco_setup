@@ -1,0 +1,14 @@
+#!/bin/bash
+#PBS -N CRO_BAS
+#PBS -P e14
+#PBS -l ncpus=4
+#PBS -l mem=16GB
+#PBS -l walltime=00:05:00
+#PBS -l wd
+#PBS -q normalbw
+#PBS -M ryan.holmes@unsw.edu.au
+#PBS -m e
+
+source setup_gadi_env.sh
+
+mpirun -np 4 croco croco.in > rundir/croco.out
