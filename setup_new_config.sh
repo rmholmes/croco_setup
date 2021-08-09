@@ -7,6 +7,12 @@ name='Benguela_VHR'
 cd ~/croco
 
 # make config dir and copy source files:
+if [ -d $name ]; then
+    echo 'New configuration directory already exists ...'
+    echo 'Exiting ...'
+    exit 2
+fi
+
 mkdir $name
 cp croco_src/OCEAN/cppdefs.h $name/
 cp croco_src/OCEAN/param.h $name/
