@@ -2,7 +2,7 @@
 #
 # Setup directory structure for a new clean configuration
 
-name='Benguela_VHR'
+name='Benguela_VHR_V2'
 
 cd ~/croco
 
@@ -32,4 +32,9 @@ ln -s /scratch/e14/rmh561/croco/$name rundir
 mkdir rundir/OUTPUT
 mkdir rundir/INPUT
 mkdir rundir/Compile
+
+# setup git:
+git init
+git add *
+git commit -m "Clean setup created by ../setup_new_config.sh"
 
