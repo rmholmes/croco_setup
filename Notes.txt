@@ -1,0 +1,64 @@
+CROCO documentation and website links:
+https://croco-ocean.gitlabpages.inria.fr/croco_doc/tutos/tutos.01.download.html
+https://www.croco-ocean.org/
+https://gitlab.inria.fr/croco-ocean -> development code
+https://forum.croco-ocean.org/questions/
+
+WRF:
+CMS WRF for Gadi: https://github.com/coecms/WRF
+CMS WRF wiki: http://climate-cms.wikis.unsw.edu.au/WRF - see bottom of
+page for tutorials/instructions.
+
+OASIS:
+CMS OASIS wiki: http://climate-cms.wikis.unsw.edu.au/Using_Oasis
+COSIMA OASIS?? https://github.com/COSIMA/oasis3-mct
+
+
+#### Sequence of instructions to setup a new run (climatological
+forcing, Benguela):
+-------------------------------------------------
+
+# Initial file edits:
+- Edit the name in setup_new_config.sh and run it to create a clean
+  directory.
+- Edit cppdefs.h with required options (e.g. name, MPI, BULK_FLUX, etc.).
+- Edit croco.in for time-step, length, input and output file names and
+  all sort of other settings.
+- Edit crocotools_param.m for input files setup (grid res, paths to
+  src directories etc).
+- Edit param.h for pre-compilation parameters (grid sizes, MPI sizes
+  etc.)
+- Edit start.m for paths.
+- Edit submit_croco.sub for PBS submission parameters.
+
+# Pre-processing:
+start matlab (you can use ../matlab_load.sh)
+
+start
+make_grid:
+        to make INPUT/croco_grd.nc
+make_bulk:
+        to make bulk forcing atmospheric forcing, could also do
+        make_forcing for flux forcing, makes INPUT/croco_blk.nc)
+
+make_bry:
+        to make boundary forcing files. Can also do make_clim to have
+        climatological nuding files that nudge into the interior. Note
+        that for WOA13 based climatology boundary conditions you need
+        to do make_forcing first in order to create wind stress inputs
+        to use in the geostrophic (/Ekman?) calculation of velocity
+        boundary conditions from T/S. Creates croco_bry.nc and
+        croco_bry_Z.nc
+
+make_ini:
+        to make the initial conditions.
+
+# Compilation:
+Edit jobcomp if needed (shouldn't be needed).
+To compile, do (creates croco executable):
+./jobcomp > jobcomp.log
+
+# To run:
+qsub submit_croco.sub
+
+output turns up in OUTPUT. The log is in OUTPUT/croco.out
