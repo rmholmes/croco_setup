@@ -62,3 +62,22 @@ To compile, do (creates croco executable):
 qsub submit_croco.sub
 
 output turns up in OUTPUT. The log is in OUTPUT/croco.out
+
+
+
+### OASIS:
+I could not get this working with the CMS gadi oasis3-mct install
+(e.g. module load openmpi/4.0.1, module use ~access/modules, module
+load oasis3-mct-local/opmi.4.0.1,
+/g/data/access/apps/oasis3-mct/ompi.4.0.1/). So in the end I had to
+download the latest version of oasis3-mct and compile it myself. This
+is located at /g/data/e14/rmh561/software/oasis3-mct/. To compile it I
+got a version of the util/make_dir/make.inc from Scott Wales setup for
+Gadi (see oasis3-mct_gadi_make.inc), put it in util/make_dir, did
+source setup_gadi_env.sh and
+make -f TopMakefileOasis3 BUILDROOT=$PWD
+
+The compilation ends up in build/
+
+
+
