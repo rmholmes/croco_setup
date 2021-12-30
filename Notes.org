@@ -1,0 +1,301 @@
+** CROCO documentation and website links:
+https://croco-ocean.gitlabpages.inria.fr/croco_doc/tutos/tutos.01.download.html
+https://www.croco-ocean.org/
+https://gitlab.inria.fr/croco-ocean -> development code
+https://forum.croco-ocean.org/questions/
+
+** WRF links:
+CMS WRF for Gadi: https://github.com/coecms/WRF
+CMS WRF wiki: http://climate-cms.wikis.unsw.edu.au/WRF - see bottom of
+page for tutorials/instructions.
+
+** OASIS links:
+CMS OASIS wiki: http://climate-cms.wikis.unsw.edu.au/Using_Oasis
+COSIMA OASIS?? https://github.com/COSIMA/oasis3-mct
+
+** CROCO-only run (climatological forcing, Benguela):
+-------------------------------------------------
+
+# Initial file edits:
+- Edit the name in setup_new_config.sh and run it to create a clean
+  directory.
+- Edit cppdefs.h with required options (e.g. name, MPI, BULK_FLUX, etc.).
+- Edit croco.in for time-step, length, input and output file names and
+  all sort of other settings.
+- Edit crocotools_param.m for input files setup (grid res, paths to
+  src directories etc).
+- Edit param.h for pre-compilation parameters (grid sizes, MPI sizes
+  etc.)
+- Edit start.m for paths.
+- Edit submit_croco.sub for PBS submission parameters.
+
+# Pre-processing:
+start matlab (you can use ../matlab_load.sh)
+
+start
+make_grid:
+        to make INPUT/croco_grd.nc
+make_bulk:
+        to make bulk forcing atmospheric forcing, could also do
+        make_forcing for flux forcing, makes INPUT/croco_blk.nc)
+
+make_bry:
+        to make boundary forcing files. Can also do make_clim to have
+        climatological nuding files that nudge into the interior. Note
+        that for WOA13 based climatology boundary conditions you need
+        to do make_forcing first in order to create wind stress inputs
+        to use in the geostrophic (/Ekman?) calculation of velocity
+        boundary conditions from T/S. Creates croco_bry.nc and
+        croco_bry_Z.nc
+
+make_ini:
+        to make the initial conditions.
+
+# Compilation:
+Edit jobcomp if needed (shouldn't be needed).
+To compile, do (creates croco executable):
+./jobcomp > jobcomp.log
+
+# To run:
+qsub submit_croco.sub
+
+output turns up in OUTPUT. The log is in OUTPUT/croco.out
+
+** OASIS compilation with CROCO
+I could not get this working with the CMS gadi oasis3-mct install
+(e.g. module load openmpi/4.0.1, module use ~access/modules, module
+load oasis3-mct-local/opmi.4.0.1,
+/g/data/access/apps/oasis3-mct/ompi.4.0.1/). So in the end I had to
+download the latest version of oasis3-mct and compile it myself. This
+is located at /g/data/e14/rmh561/software/oasis3-mct/. To compile it I
+got a version of the util/make_dir/make.inc from Scott Wales setup for
+Gadi (see oasis3-mct_gadi_make.inc), put it in util/make_dir, did
+source setup_gadi_env.sh (with intel-compiler/2019.5.281, netcdf/4.7.1
+and openmpi/4.0.2 only, I'm pretty sure) and
+make -f TopMakefileOasis3 BUILDROOT=$PWD
+
+The compilation ends up in build/
+
+Using this I could compile CROCO using the instructions at
+(https://croco-ocean.gitlabpages.inria.fr/croco_doc/tutos/tutos.16.coupling.simple.html). I.e.
+# define OW_COUPLING
+# define MRL_WCI
+Then, edit all the paths in jobcomp and notably OASIS path
+PRISM_ROOT_DIR
+./jobcomp >& compile_coupled.log
+
+I had a lot of trouble getting the toy model compiled...gave up.
+
+** WRF-only tutorial:
+# Compiling:
+Cloned https://github.com/coecms/WRF
+cd WRF/WRF
+./run_compile
+
+to compile WPS (required for real configs to prepare inputs/bcs etc.):
+cd ../WPS/
+./run_compile
+
+# Running tutorial:
+Follow WRF tutorial (basics tab
+https://www2.mmm.ucar.edu/wrf/OnLineTutorial/CASES/SingleDomain/wrf.php),
+all steps - but CMS has put together scripts to do
+this. http://climate-cms.wikis.unsw.edu.au/How_to_run_WRF
+
+# steps:
+mkdir /scratch/e14/rmh561/wrf/test
+cd /scratch/e14/rmh561/wrf/test/
+WRF_ROOT=/g/data/e14/rmh561/software/WRF/
+cp $WRF_ROOT/WPS/run_WPS.sh ./
+<modify this script to use the right WRF_ROOT and add the storage
+flag for gdata/e14>
+mkdir geogrid
+mkdir metgrid
+cp $WRF_ROOT/WPS/geogrid/GEOGRID.TBL geogrid
+cp $WRF_ROOT/WPS/namelist.wps ./
+cp $WRF_ROOT/WPS/metgrid/METGRID.TBL.ARW metgrid/METGRID.TBL
+qsub run_WPS.sh
+# This should successfully create the input files by running ungrid.exe, metgrid.exe and geogrid.exe
+
+cp $WRF_ROOT/WRF/run/* ./
+<modify run_mpi and run_real to use the right WRF_ROOT, WRF rather
+than WRFV3 and add the storage flag for gdata/e14>
+
+qsub run_real
+qsub run_mpi
+
+Make edits in namelist.input as listed at
+https://www2.mmm.ucar.edu/wrf/OnLineTutorial/CASES/SingleDomain/wrf.php
+
+Successful!
+
+For a restart run simple change the start date, end date and set
+restart = .true. in namelist.input
+
+For the SST run, follow the instructions
+https://www2.mmm.ucar.edu/wrf/OnLineTutorial/CASES/SingleDomain/ungrib.php#SST,
+with the appropriate changes in run_WPS.sh and namelist.wps. Run
+metgrid again (this overwrites the previous inputs, adding just the
+SST field). And then run the model again (qsub run_real, qsub
+run_mpi).
+
+** WRF-only ETP, ERA Interim (and updated compile)
+git clean -xf in /g/data/e14/rmh561/software/WRF/ to recompile. 
+cd WRF/
+./run_compile (takes 40 mins).
+cd ../WPS/
+./run_compile (takes 7 mins).
+
+To setup WPS:
+mkdir /scratch/e14/rmh561/wrf/era_interim
+git clone https://github.com/coecms/wps-era ./
+
+modify namelist.wps for appropriate domain and time period. THe page
+https://www2.mmm.ucar.edu/wrf/users/namelist_best_prac_wps.html#i_j_parent_start
+is useful to list all the options.
+
+make WPSDIR=/g/data/e14/rmh561/software/WRF/WPS
+
+This should create all the required input files. Check them (it worked
+first time!).
+
+cp $WRF_ROOT/WRF/run/* ./
+
+Modify namelist.input following
+https://www2.mmm.ucar.edu/wrf/users/namelist_best_prac_wrf.html
+Note: dx and dy must match the global attributes in the met_em*.nc
+files. 
+
+qsub run_real
+
+Modify # of processors in run_mpi according to
+https://forum.mmm.ucar.edu/phpBB3/viewtopic.php?t=5082,
+by default, the decomposition is done automatically (see
+README.namelist), but you can set it if you want in &domains section
+of namelist.input. I tried with 32 but it said too many. Successful
+with 16. Now going with 20.
+
+qsub run_mpi
+
+Successfully run a day. Now going to run a month (Nov 2005) with
+reduced output a larger time step. I got a seg fault with a 180 second
+time step. Reduced to 135 and it seems to work
+
+The month run seemed to work. Although is the SST fixed at its initial
+value?
+
+** Thoughts on implementation 10/10/2021
+
+*** payu: Might work. Already deals with oasis. 
+
+croco is quite simple with
+minimal input and config files. However, Croco doesn't use the
+standard namelist system in croco.in which contains all the input
+timing (e.g. the actual dates within which the run starts and
+finishes??). 
+
+WRF is more complicated, but does use the standard namelist system.
+
+
+Maybe ask CMS what they think about using payu to run croco and WRF?
+
+** Next steps 10/10/2021:
+
+Otherwise I have to start getting OASIS to work. However, this may not
+be worth doing myself as the Toulouse guys likely already have scripts
+to do the coupling, generate the weights and make the namcouple
+file...
+
+Also, still to look into:
+- WRF with varying SSTs: -> probably just need to set sst_update in
+  namelist.input
+- WRF compile with OASIS: Follow instructions in croco tutorial - they
+  have everything that is needed. 
+- CROCO and WRF timing with restarts (can payu do this for me)?
+- WRF-CROCO setup (note: I guess we pass the fluxes one way and the
+  SST, usurf, vsurf the other?)
+
+** Benguela coupled setup following CROCO tutorial:
+*** Setup
+mkdir /scratch/e14/rmh561/croco_wrf/Benguela_coupled
+mkdir ~/croco/scratch/e14/rmh561/croco_wrf/Benguela_coupled
+cd ~/croco/scratch/e14/rmh561/croco_wrf/Benguela_coupled
+cp ~/croco/croco_tools_src/Coupling_tools/create_config ./
+<edit for paths - many>
+./create_config
+<edit paths in run_env>
+*** Compiling CROCO:
+Copy jobcomp from ~/croco/Benguela_LR_cpl/
+<edit paths -> note I had a problem with PRISM_ROOT, must point at
+...../oasis3-mct/build>
+./make_CROCO_compil
+This was successful (I got croco.oa).
+*** Compiling WRF:
+This looks tricky. The CROCO tutorial have used a modified version of
+3.7.1. The CMS version of WRF is 4.3, that I might need to modify?
+
+**** Uncoupled WRF (as before)
+Started off by re-compiling WRF as previously (this would be in
+uncoupled mode). Modified ../build.env to use openmpi/4.0.2 rather
+than 4.0.1. and then did "git clean -xf" in /g/data/e14/rmh561/WRF/,
+cd WRF/, ./run_compile. This submits a job (takes ~40 mins), compiled
+fine. I copied all the .exe files in main/, along with the
+configure.wrf and the log (compile_job.o***) to 
+/scratch/e14/rmh561/croco_wrf/wrf_exes/uncoupled_c2b02af69c856/
+
+**** Coupled WRF
+Again in WRF/WRF, first ./clean -a to clean the config (after copying
+the exes!!). Then, cp configure.wrf.backup to configure.wrf and modify
+configure.wrf to include the oasis flags following listed in step 6 of
+the CROCO tutorial under "Compiling WRF". To use this I then commented
+out the section in run_compile that overwrites the configure.wrf file
+(I couldn't seem to get my own qsub script to work), and added it
+under git. Saved this configure.wrf in
+/scratch/e14/rmh561/croco_wrf/wrf_exes/coupled_3b5c894c918387/. Then
+./run_compile. This worked, but only just squeaked in with 1:21 of the
+1:30 walltime! .exe's copied to coupled_3b5.... 
+
+By the way: the oasis coupling code is in frames/module_cpl_oasis3*. 
+
+***** Notes:
+Comparing the so generated WRF/configure.wrf to the version provided
+from croco
+(~/croco_wrf/Benguela_coupled/wrf_in/inputs.../configure.wrf.uncoupled)
+seems to show most changes are architecture related (so I want mine!),
+except perhaps a few new modules in WRF included in the "compile
+without OMP or without high optimization")? So this is all
+architecture related?
+
+Comparing the croco uncoupled and coupled configure.wrf shows changes
+only associated with OASIS. These are the ones listed in step 6 of the
+CROCO tutorial under "Compiling WRF". These are made by hand in CROCO,
+so I probably just need to figure out how to hack this in the CMS WRF
+version? Should be pretty easy. Simply do the steps in run_compile all
+by hand, edit the configure.wrf file with the required changes, and
+then do the subsequent steps with this file. TODO...
+
+***** NOW
+I also found Guillaume's NOW setup, copied to the tar.gz in
+/g/data/e14/rmh561/NOW. Looks like he has versions of
+configure.wrf.coupled for use on raijin (most up to date in
+wrf3.5.1_red_flx??). The Oasis inclusions there look very simple
+(there's only a few of them, linked to OA3MCT_ROOT_DIR. Might be
+easy?!?...
+
+**** WPS
+As above, cd /g/data/e14/rmh561/WRF/WPS
+./run_compile
+
+*** Pre-processing CROCO
+in croco_in edited start.m and crocotools_param.m for paths (and
+needed to add topo_smooth parameter). Then ran matlab and
+start
+make_grid
+make_bulk
+make_forcing
+make_bry
+make_ini
+
+This all seemed to work fine, producing the required files in /scratch/.../croco_files/
+
+*** Pre-processing WRF
