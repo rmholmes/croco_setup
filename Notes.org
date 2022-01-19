@@ -1,3 +1,4 @@
+* CROCO v1.1
 ** CROCO documentation and website links:
 https://croco-ocean.gitlabpages.inria.fr/croco_doc/tutos/tutos.01.download.html
 https://www.croco-ocean.org/
@@ -185,7 +186,6 @@ The month run seemed to work. Although is the SST fixed at its initial
 value?
 
 ** Thoughts on implementation 10/10/2021
-
 *** payu: Might work. Already deals with oasis. 
 
 croco is quite simple with
@@ -195,7 +195,6 @@ timing (e.g. the actual dates within which the run starts and
 finishes??). 
 
 WRF is more complicated, but does use the standard namelist system.
-
 
 Maybe ask CMS what they think about using payu to run croco and WRF?
 
@@ -299,3 +298,114 @@ make_ini
 This all seemed to work fine, producing the required files in /scratch/.../croco_files/
 
 *** Pre-processing WRF
+** Indo-Pacific basin-wide CROCO only configuration 30/12/2021
+*** Setup to first working run
+Cloned ETPcroco setup.
+
+Changed from FRC_BRY to CLIMATOLOGY in cppdefs.h
+
+Updated other settings to reflect changes in grid size and
+parallelization.
+
+../matlab_load.sh
+start
+make_grid
+make_forcing
+make_bulk
+make_ini
+make_bry
+
+Note: Failed first time because I had the minimum longitude in degrees
+east rather than negative degrees west. I guess I have to use the same
+for each of the two limits. 
+
+Note 2: Set the res and limits in crocotools_param, and then use the
+printed output of make_grid to set LLm and MMm in param.h
+
+For IPBW I picked:
+lonmin =  -330;   % Minimum longitude [degree east]
+lonmax =  -70;   % Maximum longitude [degree east]
+latmin = -34;   % Minimum latitudeF  [degree north]
+latmax = 60;   % Maximum latitude  [degree north]
+dl = 1/4;
+
+I got LLm=1039 and MMm=446
+
+So I split my grid into 24 * 10 
+
+Once output produced do compilation:
+./jobcomp > jobcomp.log
+
+Something wrong with netcdf libraries; for some reason the include
+path wasn't working, didn't include netcdf.inc. So I hard coded
+NETCDFLIB and NETCDFINC. NETCDFINC with nf-config --includedir doesn't
+seem to pick up the /apps/netcdf/4.7.1/include/Intel directory (just
+getting include).
+
+Got it running but it crashed immediately with a blow-up
+error. Dropping the time step by a factor of 3 to 1200s seems to have
+worked. This was working with FRC_BRY and not CLIMATOLOGY.
+
+Now trying to get a run with CLIMATOLOGY and a closed northern
+boundary working. 
+
+Note: run_start_date, run_end_date and output_time_steps are only used
+when USE_CALENDAR is active, in which case DT_AVG etc. overwrite NAVG
+etc.
+
+Had to do "make_clim" in matlab to get croco_clm.nc; this doesn't seem
+to work due to a netcdf close problem that I can probably fix... But
+for now reverting to FRC_BRY (but keeping a closed northern
+boundary).
+
+I/O is a massive performance bottleneck - it is taking ages. Too much
+output + a big domain + serial I/O?
+
+*** Parallel I/O
+There are a few utilities available to setup a parallel I/O run, which
+should make things run much quicker.
+
+Activate PARALLEL_FILES in cppdefs.h and recompile
+
+To get this setup, first cd to Compile, source set_gadi_env.sh and do
+gmake partit
+gmake ncjoin
+
+copy the partit and ncjoin executables to the appropriate
+locations. Then in INPUT do:
+./partit 24 10 croco_grd.nc
+./partit 24 10 croco_bry.nc
+./partit 24 10 croco_bry_Z.nc
+./partit 24 10 croco_blk.nc
+./partit 24 10 croco_frc.nc
+./partit 24 10 croco_ini.nc
+
+This creates 240 files for each type above. Then run as normal.
+
+To rejoin at the end in OUTPUT do:
+ncjoin croco_avg.*.nc
+
+Takes a while (e.g. ~10 secs per time record for croco_avg.nc, or 5
+mins for 30 days). 
+
+This is wayyyyyyy quicker. 
+
+Previous run speed: 20-25 days / hour on 240 CPUs, 
+New run speed: 600 days / hour on 240 CPUs!!!
+Equivalent to 40 years / day. That's almost as fast as ACCESS-OM2-1.
+
+
+*** Spinup run
+Started a single year spinup run with 5-daily output.
+
+This ran through 3/4 of the year in 25 mins or so, and then crashed
+with a blow-up. 
+
+Combining the output does take a while. Can I run this with mpirun?
+
+** Pacific basin-wide CROCO
+As for Indo-Pacific with western boundary at -260E. 
+
+Mask is ridiculously easy to edit. Did this to remove Atlantic and fix
+bays etc. while doing make_grid
+* CROCO v1.2 - January 2022
