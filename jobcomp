@@ -26,7 +26,7 @@ source setup_gadi_env.sh
 #
 # set source, compilation and run directories
 #
-ROOT_DIR=/g/data/e14/rmh561/croco/src/croco-v1.1
+ROOT_DIR=/g/data/e14/rmh561/croco/src/croco
 SOURCE=$ROOT_DIR/OCEAN
 SCRDIR=rundir/Compile
 RUNDIR=`pwd`
@@ -39,10 +39,8 @@ echo "OPERATING SYSTEM IS: $OS"
 #
 # compiler options
 #
-FC=ifort
-CC=icc
-F90=ifort
-F77=ifort
+# FC=gfortran
+# RMH: FC, CC, F90, F77 set by setup_gadi_env.sh
 
 #
 # set MPI directories if needed
@@ -64,18 +62,22 @@ MPIINC="-I$MPIDIR/include"
 #
 #NETCDFLIB="-L/usr/local/lib -lnetcdf"
 #NETCDFINC="-I/usr/local/include"
-NETCDFLIB=$(nf-config --flibs)
-NETCDFINC=-I$(nf-config --includedir)
+NETCDFLIB="-L/apps/netcdf/4.7.1/lib/Intel -lnetcdff -lnetcdf -lnetcdf -ldl -lm"
+NETCDFINC="-I/apps/netcdf/4.7.1/include/Intel"
 
 #
 # set OASIS-MCT (or OASIS3) directories if needed
 #
-PRISM_ROOT_DIR=../../../oasis3-mct/compile_oa3-mct
+PRISM_ROOT_DIR=/g/data/e14/rmh561/oasis3-mct/build
 
 #
 # set XIOS directory if needed
 #
-XIOS_ROOT_DIR=$HOME/xios-1.0
+# if coupling with OASIS3-MCT is activated :
+# => you need to use XIOS compiled with the "--use_oasis oasis3_mct" flag
+#-----------------------------------------------------------
+XIOS_ROOT_DIR=$HOME/xios
+
 #
 # END OF USER'S MODIFICATIONS
 ####################################################
@@ -108,15 +110,26 @@ ls ${SOURCE}/jobcomp           > /dev/null  2>&1 && \cp ${SOURCE}/jobcomp $SCRDI
 ls ${SOURCE}/amr.in            > /dev/null  2>&1 && \cp ${SOURCE}/amr.in $SCRDIR
 ls ${AGRIF_SRC}                > /dev/null  2>&1 && \cp -r ${AGRIF_SRC} $SCRDIR
 ls ${ROOT_DIR}/XIOS/*.F        > /dev/null  2>&1 && \cp ${ROOT_DIR}/XIOS/*.F $SCRDIR
-ls ${ROOT_DIR}/PISCES/*        > /dev/null  2>&1 && \cp ${ROOT_DIR}/PISCES/* $SCRDIR
+ls ${ROOT_DIR}/PISCES/*        > /dev/null  2>&1 && \cp -r ${ROOT_DIR}/PISCES/* $SCRDIR
+ls ${ROOT_DIR}/PISCES/SED/*    > /dev/null  2>&1 && \cp ${ROOT_DIR}/PISCES/SED/* $SCRDIR
 ls ${ROOT_DIR}/PISCES/kRGB61*  > /dev/null  2>&1 && \cp ${ROOT_DIR}/PISCES/kRGB61* $RUNDIR
+ls ${ROOT_DIR}/MUSTANG/*       > /dev/null  2>&1 && \cp -r ${ROOT_DIR}/MUSTANG/* $SCRDIR
 
-if [[ -e "namelist_pisces" ]] ; then
+if [[ -e "namelist_pisces_ref" ]] ; then
         echo "  file namelist_pisces exists in Run directory"
 else
         \cp -f ${ROOT_DIR}/PISCES/namelist_pisces* $RUNDIR
         echo "  file namelist_pisces copied from source directory"
 fi
+
+if [[ -d MUSTANG_NAMELIST ]]; then
+        echo "  Mustang namelist directory MUSTANG_NAMELIST exists"
+else
+        mkdir -p $RUNDIR/MUSTANG_NAMELIST
+        \cp -rf ${ROOT_DIR}/MUSTANG/MUSTANG_NAMELIST/*txt $RUNDIR/MUSTANG_NAMELIST/.
+        echo "  file para*txt copied from source directory"
+fi
+
 #
 # overwrite with local files
 #
@@ -124,6 +137,7 @@ fi
 ls *.F90   > /dev/null  2>&1 && \cp -f *.F90 $SCRDIR
 ls *.F     > /dev/null  2>&1 && \cp -f *.F $SCRDIR
 ls *.h     > /dev/null  2>&1 && \cp -f *.h $SCRDIR
+ls *.h90   > /dev/null  2>&1 && \cp -f *.h90 $SCRDIR
 ls Make*   > /dev/null  2>&1 && \cp -f Make* $SCRDIR
 ls jobcomp > /dev/null  2>&1 && \cp -f jobcomp $SCRDIR
 
@@ -147,9 +161,9 @@ if [[ $OS == Linux || $OS == Darwin ]] ; then           # ===== LINUX =====
 #                       -check uninit -CA -CB -CS -ftrapuv -fpe1"
 		LDFLAGS1="$LDFLAGS1"
 	elif [[ $FC == gfortran ]] ; then
-		CPP1="cpp  -traditional -DLinux"
+		CPP1="cpp -traditional -DLinux"
 		CFT1=gfortran
-		FFLAGS1="-O3 -fdefault-real-8 -fdefault-double-8 "
+		FFLAGS1="-O3 -fdefault-real-8 -fdefault-double-8"
 #		 FFLAGS1="-O0 -g -fdefault-real-8 -fdefault-double-8 -fbacktrace \
 #			-fbounds-check -finit-real=nan -finit-integer=8888"
 		LDFLAGS1="$LDFLAGS1"
@@ -203,7 +217,10 @@ FFLAGS1=${CROCO_FFLAGS1-$FFLAGS1}
 CFT1=${CROCO_CFT1-$CFT1}
 
 #
-# determine if XIOS compilation is required
+# - Determine if XIOS librairies is required 
+# - if it is the case :
+#     => if XIOS compiled with oasis, add the OASIS inc. files and librairies
+#     => pre-processing (using cpp) of the xml files required by XIOS 
 #
 unset COMPILEXIOS
 echo "Checking COMPILEXIOS..."
@@ -211,17 +228,15 @@ XIOS_ROOT_DIR=${CROCO_XIOS_ROOT_DIR-$XIOS_ROOT_DIR}
 if $($CPP1 testkeys.F | grep -i -q xiosisdefined) ; then
         echo " => XIOS activated"
         COMPILEXIOS=TRUE
-        LDFLAGS1="$LDFLAGS1 $XIOS_ROOT_DIR/lib/libxios.a  -lstdc++ -lnetcdff"
+        LDFLAGS1="$LDFLAGS1 $XIOS_ROOT_DIR/lib/libxios.a  -lstdc++ -lnetcdff -lnetcdf"
         CPPFLAGS1="$CPPFLAGS1 -I$XIOS_ROOT_DIR/inc"
         FFLAGS1="$FFLAGS1 -I$XIOS_ROOT_DIR/inc"
-        ln -s $XIOS_ROOT_DIR/bin/xios_server.exe $RUNDIR/.
-        $CPP1 -P -traditional -imacros cppdefs.h  ${ROOT_DIR}/XIOS/field_def.xml_full $RUNDIR/field_def.xml
-        $CPP1 -P -traditional -imacros cppdefs.h  ${ROOT_DIR}/XIOS/domain_def.xml $RUNDIR/domain_def.xml
-        $CPP1 -P -traditional -imacros cppdefs.h  ${ROOT_DIR}/XIOS/iodef.xml $RUNDIR/iodef.xml
+	
+        ln -fs $XIOS_ROOT_DIR/bin/xios_server.exe $RUNDIR/.
 fi
 
 #
-# determine if OASIS compilation is required
+# determine if OASIS librairies are required
 #
 unset COMPILEOASIS
 echo "Checking COMPILEOASIS..."
@@ -311,5 +326,7 @@ rm -f flags.tmp
 $MAKE depend
 $MAKE
   
-[ -f croco ] && mv croco $RUNDIR
+[[ -f croco  ]] && mv croco $RUNDIR
+[[ -f partit ]] && mv partit $RUNDIR
+[[ -f ncjoin ]] && mv ncjoin  $RUNDIR
 #

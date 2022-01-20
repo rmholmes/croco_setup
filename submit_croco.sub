@@ -3,11 +3,13 @@
 #PBS -P e14
 #PBS -l ncpus=4
 #PBS -l mem=16GB
-#PBS -l walltime=01:00:00
+#PBS -l walltime=00:30:00
 #PBS -l wd
 #PBS -q normalbw
-#PBS -M ryan.holmes@unsw.edu.au
+#PBS -M r.holmes@unsw.edu.au
+#PBS -l storage=gdata/e14+scratch/e14
 #PBS -m e
+#PBS -P v45
 
 source setup_gadi_env.sh
 

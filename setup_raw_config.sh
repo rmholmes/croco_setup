@@ -2,7 +2,7 @@
 #
 # Setup directory structure for a new clean configuration
 
-name='Benguela_VHR_V2'
+name='Benguela_LR'
 
 cd ~/croco
 
@@ -12,7 +12,13 @@ if [ -d $name ]; then
     echo 'Exiting ...'
     exit 2
 fi
+if [ -d /scratch/e14/rmh561/croco/$name ]; then
+    echo 'New work directory already exists ...'
+    echo 'Exiting ...'
+    exit 2
+fi
 
+# Setup config directory:
 mkdir $name
 cp croco_src/OCEAN/cppdefs.h $name/
 cp croco_src/OCEAN/param.h $name/
@@ -25,7 +31,7 @@ cp submit_croco.sub $name/
 cp setup_gadi_env.sh $name/
 cp jobcomp $name/
 
-# setup links in directory:
+# setup links to work directories:
 cd $name
 mkdir /scratch/e14/rmh561/croco/$name
 ln -s /scratch/e14/rmh561/croco/$name rundir
