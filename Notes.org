@@ -1,4 +1,4 @@
-* CROCO v1.1
+* General links and compilations
 ** CROCO documentation and website links:
 https://croco-ocean.gitlabpages.inria.fr/croco_doc/tutos/tutos.01.download.html
 https://www.croco-ocean.org/
@@ -14,6 +14,7 @@ page for tutorials/instructions.
 CMS OASIS wiki: http://climate-cms.wikis.unsw.edu.au/Using_Oasis
 COSIMA OASIS?? https://github.com/COSIMA/oasis3-mct
 
+* CROCO v1.1 tutorials and initial runs, with some WRF/OASIS
 ** CROCO-only run (climatological forcing, Benguela):
 -------------------------------------------------
 
@@ -183,7 +184,8 @@ reduced output a larger time step. I got a seg fault with a 180 second
 time step. Reduced to 135 and it seems to work
 
 The month run seemed to work. Although is the SST fixed at its initial
-value?
+value? - LATER NOTE: I think this is because I didn't have
+sst_update=1 in namelist.input
 
 ** Thoughts on implementation 10/10/2021
 *** payu: Might work. Already deals with oasis. 
@@ -409,3 +411,188 @@ As for Indo-Pacific with western boundary at -260E.
 Mask is ridiculously easy to edit. Did this to remove Atlantic and fix
 bays etc. while doing make_grid
 * CROCO v1.2 - January 2022
+Running quickly through the updated tutorial. A few initial notes:
+
+- They now have their own version of WRF (which includes wave coupling
+  and some other things) - https://github.com/wrf-croco/WRF, this is
+  version 4.2.1, and I need the same version of WPS (from
+  https://github.com/wrf-model/WPS.git, with git checkout tags/v4.2)
+  to get it working.
+
+- I could use create_config.bash to create the configs directory - but
+  this gives me lots of extra files that I don't think I need. So lets
+  just stick with what I have.
+** Quick re-run through Benguela_LR for checks on compile etc.
+
+- updated jobcomp (and setup_raw_config) in base to v1.2.
+- ran setup_raw_config.
+- modified paths in start.m and crocotools_param.m
+- Matlab; start, make_grid, make_bulk, make_forcing, make_bry,
+  make_ini
+- Modify param.h (MPI settings) and cppdefs.h (MPI, FRC_BRY,
+  BULK_FLUX). 
+- Compilation; ran into a problem with netcdf -> needed to hard code
+  NETCDFLIB and NETCDFINC In jobcomp as above for Indo-Pacific run.
+- Modified output paths in croco.in
+- Runs fine.
+*** Interannual forcing [FAILED]
+- A few modifications as for tutorial
+(https://croco-ocean.gitlabpages.inria.fr/croco_doc/tutos/tutos.05.prepro.matlab.inter.html)
+- Matlab; Fails on the data download step of make_CFSR (seems as
+  before). make_OGCM (with data download) seems to work. I think I
+  need to put some work into this (see readme files in the various
+  crocotools directories).
+** Coupling - toy [FAILED]
+*** OASIS compilation:
+Checked out latest OASIS3-mct version (on OASIS3-MCT_5.0 branch in
+/g/data/e14/rmh561/oasis3-mct/).
+Copied in my make.inc from croco configs directory.
+source ~/croco/setup_gadi_env.sh
+make realclean -f TopMakefileOasis3 > oasis_clean.out
+make -f TopMakefileOasis3 BUILDROOT=$PWD > oasis_make.out
+# Note: The buildroot was essential otherwise i got a permissions error.
+Seems to have worked.
+*** CROCO compilation:
+Activate OW_Coupling in cppdefs.h
+./jobcomp >& compile_coupled.log
+Successfull.
+*** TOY model compilation:
+cp -r croco_src/SCRIPTS/SCRIPTS_COUPLING/TOY_IN ./.
+cd TOY_IN
+Modify Makefile for Gadi (took a while to get this working, see copy
+in this directory).
+Compiled fine. 
+But the toy model requires input .nc files, which I don't have... They
+can be created from model output using the create_oasis_toy_files.sh
+script in the SCRIPTS_COUPLING - but I don't have a ww3 run to do this
+from.
+
+I could do this from WRF -> but need the right output (e.g. TAUX is
+not output from my current ETP run).
+
+** Coupling - CROCO-WRF, following tutorial
+Note: I started doing this with BENGUELA_LR, but realised it's
+probably easier to just do an ETP config, since I already have that
+running for an ETP domain. So after step 6, prior to WPS
+pre-processing, I redid it for ETP_cpl. See notes for "ETP_cpl" below
+for modifications. 
+
+*** 1 Architecture setup:
+cp croco_src/create_config.bash ./
+edit create_config.bash for BENGUELA_cpl with all-prod-cpl.
+Note; a backup of this file is inside the BENGUELA_cpl folder as
+.bck. 
+git init, add *
+Edit myenv_mypath.sh for source setup_gadi_env.sh, paths, compilers
+etc.
+source myenv_mypath.sh
+*** 2 OASIS compilation
+As above in "coupling toy"
+*** 3 CROCO pre-processing:
+edit crocotools_param.m in PREPRO/croco directory
+matlab:
+   start 
+   make_grid
+   make_forcing
+   make_bry
+   make_ini
+ls /scratch/e14/rmh561/croco/BENGUELA_cpl/CROCO_FILES/
+croco_bry.nc  croco_bry_Z.nc  croco_frc.nc  croco_grd.nc  croco_ini.nc
+**** ETP_cpl
+Modified crocotools_param.m for a few names (didn't need to do lonmin,
+latmin etc.), and modified
+make_grid_from_WRF.m to use the ETP_wrf run done before. Then
+matlab:
+   start
+   make_grid_from_WRF
+   make_forcing
+   make_bry
+   make_ini
+Take LLm and MMm from make_grid printed output and use in param.h.
+Note: I messed up the BENGUELA croco input - would need to
+regenerate. 
+*** 4 CROCO compilation
+Modify jobcomp, cppdefs.h and param.h according to Benguela_LR in CROCO_IN/
+Note that the jobcomp Compile directory is just local, not in rundir
+link, now. 
+./jobcomp &> jobcomp_coupled.log
+*** 5 WRF compilation
+First try with CLEX CMS based WRF from /g/data/e14/rmh561/WRF/
+
+The below is copied from above (including executables, which I'd
+copied previously to /scratch/e14/rmh561/croco_wrf/wrf_exes/) from my
+earlier compilation:
+**** Uncoupled WRF (as before)
+Started off by re-compiling WRF as previously (this would be in
+uncoupled mode). Modified ../build.env to use openmpi/4.0.2 rather
+than 4.0.1. and then did "git clean -xf" in /g/data/e14/rmh561/WRF/,
+cd WRF/, ./run_compile. This submits a job (takes ~40 mins), compiled
+fine. I copied all the .exe files in main/, along with the
+configure.wrf and the log (compile_job.o***) to 
+/scratch/e14/rmh561/croco_wrf/wrf_exes/uncoupled_c2b02af69c856/
+
+**** Coupled WRF
+Again in WRF/WRF, first ./clean -a to clean the config (after copying
+the exes!!). Then, cp configure.wrf.backup to configure.wrf and modify
+configure.wrf to include the oasis flags following listed in step 6 of
+the CROCO tutorial under "Compiling WRF". To use this I then commented
+out the section in run_compile that overwrites the configure.wrf file
+(I couldn't seem to get my own qsub script to work), and added it
+under git. Saved this configure.wrf in
+/scratch/e14/rmh561/croco_wrf/wrf_exes/coupled_3b5c894c918387/. Then
+./run_compile. This worked, but only just squeaked in with 1:21 of the
+1:30 walltime! .exe's copied to coupled_3b5.... 
+
+By the way: the oasis coupling code is in frames/module_cpl_oasis3*. 
+    
+*** 6 WPS compilation
+As above, WPS is already compiled with executables in the WPS root
+directory.
+
+*** WPS pre-processing
+For a first attempt I'm going to use the COE's ERA-Interim setup. This
+was cloned from /scratch/e14/rmh561/wrf/ETP_WRF to
+/scratch/e14/rmh561/wrf/ETP_WRF_clean, I adjusted the time in
+namelist.wps to 2005-01 -> 2005-03 and then did make
+WPSDIR=/g/data/e14/rmh561/WRF/WPS to make the files. Then copied
+met_em.d01* and geo_em.d01.nc to
+/scratch/e14/rmh561/croco/ETP_cpl/WRF_FILES/
+
+*** WRF/real pre-processing
+In WRF_IN, modified run_real and configure.namelist.real for paths and
+to copy values in the ERA-Interim wrf (although there are some
+differences). 
+
+Note: Don't set nprocX and nprocY - leave them as -1 and it'll do it
+automatically.
+
+I couldn't get this working, so instead I just copied the already
+created wrfbdy_d01 and wrfinput_d01 from ETP_WRF run previously. 
+
+Also copied the namelist.input file from this run, and modified:
+in &physics: sst_update = 1 if your are coupling with an ocean model
+in &domains: num_ext_model_couple_dom = X : number of domains of the
+other model.
+
+Also made CPLMASK=1 everywhere in wrfinput_d01.
+
+Also modified create_oasis_grids_from_wrf.sh and ran (including a
+chmod +x on this file and the to_wrf_stag_grid.sh) to create
+masks.wrf.nc and grids.wrf.nc ins WRF_FILES.
+
+The CROCO tutorial for coupling then proceeds as if you were using the
+toy model... It's not very well organised...
+
+So instead I just continued trying to do WRF-CROCO.
+*** OASIS setup
+This is all done automatically by submit_job.sh. I tried to get this
+working by modifying a number of scripts for setup etc. The OASIS
+stuff seemed to work ok. However, I ended up giving up running into
+qsub submission issues (e.g. app.conf wasn't seeming to be
+accepted). I could probably solve these, but it's not obvious...
+
+* CURRENT STATUS:
+** CROCO only - got to figure out interannual forcing
+** CROCO-TOY -> would probably run if I could generate the toy input files from WRF
+** CROCO-WRF with COE WRF ERA-Interim -> ran into submitjob problems qsub
+** CROCO-WRF with CROCO WRF -> haven't tried yet.
