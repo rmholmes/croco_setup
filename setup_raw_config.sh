@@ -2,7 +2,7 @@
 #
 # Setup directory structure for a new clean configuration
 
-name='Benguela_LR'
+name='PBW'
 
 cd ~/croco
 

@@ -301,6 +301,13 @@ This all seemed to work fine, producing the required files in /scratch/.../croco
 
 *** Pre-processing WRF
 ** Indo-Pacific basin-wide CROCO only configuration 30/12/2021
+Note: This will be forced with the COADS climatology (Ishii et
+al. 2005) and the lateral boundaries are from WOA2009 climatology,
+with geostrophic and Ekman velocities (over a constant 40m depth Ekman
+layer). The equatorial values for eastern and western boundaries
+(between +-2-degrees) are obtained by interpolation of values outside
+the equatorial band across +-2-degrees.
+
 *** Setup to first working run
 Cloned ETPcroco setup.
 
@@ -396,7 +403,6 @@ Previous run speed: 20-25 days / hour on 240 CPUs,
 New run speed: 600 days / hour on 240 CPUs!!!
 Equivalent to 40 years / day. That's almost as fast as ACCESS-OM2-1.
 
-
 *** Spinup run
 Started a single year spinup run with 5-daily output.
 
@@ -422,7 +428,7 @@ Running quickly through the updated tutorial. A few initial notes:
 - I could use create_config.bash to create the configs directory - but
   this gives me lots of extra files that I don't think I need. So lets
   just stick with what I have.
-** Quick re-run through Benguela_LR for checks on compile etc.
+** Benguela_LR climatological
 
 - updated jobcomp (and setup_raw_config) in base to v1.2.
 - ran setup_raw_config.
@@ -435,15 +441,86 @@ Running quickly through the updated tutorial. A few initial notes:
   NETCDFLIB and NETCDFINC In jobcomp as above for Indo-Pacific run.
 - Modified output paths in croco.in
 - Runs fine.
-*** Interannual forcing [FAILED]
-- A few modifications as for tutorial
-(https://croco-ocean.gitlabpages.inria.fr/croco_doc/tutos/tutos.05.prepro.matlab.inter.html)
-- Matlab; Fails on the data download step of make_CFSR (seems as
-  before). make_OGCM (with data download) seems to work. I think I
-  need to put some work into this (see readme files in the various
-  crocotools directories).
-** Coupling - toy [FAILED]
-*** OASIS compilation:
+** Benguela_LR interannual 
+Continued from above (actually recompiled, but all the same), following...
+https://croco-ocean.gitlabpages.inria.fr/croco_doc/tutos/tutos.05.prepro.matlab.inter.html
+
+*** SODA:
+in matlab make_OGCM with SODA data and download works, creating
+bry_*_SODA and ini_*_SODA files.
+
+*** CFSR: make_CFSR with data download doesn't work. Need to download by hand
+according to readme in Aforc_CFSR. Have registered for an NCAR
+account...
+
+*** ERA5: 
+I looked at the NCI ERA5, but it didn't seem to have all the
+variables that CROCO wants. E.g. the total precipitation only seems to
+be present in the monthly-averaged or monthly-averaged-by-hour
+products, and CROCO wants this. I shouldn't need it - as there are
+other precip variables (e.g. ACCESS-OM2 is going to use mcpr and
+mlspr), but that would require hacking the CROCO-tools routines.
+
+So instead following croco download instructions: in the Aforc_ERA5
+readme, involving registering and installing api from
+https://cds.climate.copernicus.eu/api-how-to. Copied ERA5 scripts to
+local and modified era5_crocotools_param.py. Then in that directory
+do: "python ERA5_request.py". The download for 3 months took a long
+time... (1 hour+).  Then did "python ERA5_convert.py" (this creates
+the files without the ERA5_ecmwf_ prefix. Then, to process pre-made
+interpolated croco files added Aforc_ERA5 to matlab path in start,
+then in matlab do Make_ERA5. This all worked fine and produced the
+expected croco_blk_ERA5* files.
+
+*** CMEMS/mercator glorys 1/12-degree:
+Just modify parameters in crocotools_param, register for account and
+do make_OGCM_mercator and it seemed to work, including
+download. Creates the bry_*_mercator and ini_*_mercator files. 
+*** ERA5 - mercator run 2005-01 -> 2005-03 in 3 sections.
+Worked ok, after I played around a bit. DON't use USE_CALENDAR (see
+strip replacements in run_croco_inter.bash - it uses ntimes). Also the
+ERA5 data wasn't overlapping properly for a month and so errored in
+the last time step of the month (because it couldn't find the blk
+data). Increasing itolap_era5 from 1 to 2 in crocotools_param.m and
+rerunning make_ERA5 fixed it and I got a succesful run.
+
+** PBW updated
+
+Updated PBW v1.1 configs to v1.2 and adjusted (see git history).
+
+../matlab_load.sh
+start
+make_grid -> edited mask again.
+make_forcing
+make_bulk
+make_ini
+make_bry
+
+./jobcomp > jobcomp.log
+
+In INPUT:
+~/croco/PBW/partit 16 9 croco_grd.nc
+~/croco/PBW/partit 16 9 croco_ini.nc
+~/croco/PBW/partit 16 9 croco_bry.nc
+~/croco/PBW/partit 16 9 croco_bry_Z.nc
+~/croco/PBW/partit 16 9 croco_blk.nc
+~/croco/PBW/partit 16 9 croco_frc.nc
+
+But this didn't work for some reason - the new version of partit
+doesn't put every field in every bry file. Why?
+
+Trying instead with NC4PAR - did not work either. Another option is
+XIOS (which I think is what they use in CROCO-WRF).
+
+For now continuing with serial output...
+
+Had a problem with too fast velocities through the ITF. Edited the
+mask again to close the eastern most passage completely and then reran
+through all above and started again (5 years). 
+
+** Coupling
+*** Coupling - toy [FAILED]
+**** OASIS compilation:
 Checked out latest OASIS3-mct version (on OASIS3-MCT_5.0 branch in
 /g/data/e14/rmh561/oasis3-mct/).
 Copied in my make.inc from croco configs directory.
@@ -452,11 +529,11 @@ make realclean -f TopMakefileOasis3 > oasis_clean.out
 make -f TopMakefileOasis3 BUILDROOT=$PWD > oasis_make.out
 # Note: The buildroot was essential otherwise i got a permissions error.
 Seems to have worked.
-*** CROCO compilation:
+**** CROCO compilation:
 Activate OW_Coupling in cppdefs.h
 ./jobcomp >& compile_coupled.log
 Successfull.
-*** TOY model compilation:
+**** TOY model compilation:
 cp -r croco_src/SCRIPTS/SCRIPTS_COUPLING/TOY_IN ./.
 cd TOY_IN
 Modify Makefile for Gadi (took a while to get this working, see copy
@@ -470,7 +547,7 @@ from.
 I could do this from WRF -> but need the right output (e.g. TAUX is
 not output from my current ETP run).
 
-** Coupling - CROCO-WRF, following tutorial
+*** Coupling - CROCO-WRF with COE WRF
 Note: I started doing this with BENGUELA_LR, but realised it's
 probably easier to just do an ETP config, since I already have that
 running for an ETP domain. So after step 6, prior to WPS
@@ -591,8 +668,96 @@ stuff seemed to work ok. However, I ended up giving up running into
 qsub submission issues (e.g. app.conf wasn't seeming to be
 accepted). I could probably solve these, but it's not obvious...
 
+* Lionel's PAC12 setup
+** Email
+
+croco_bry.tar contains all the CROCO netcdf files (grd, rst, bry) (to
+be copied in your CROCO_FILES directory)
+wrf_files.tar contains all the WRF inputs files  (to be copied in your
+WRF_FILES directory).
+
+Myfiles_home contains various ascii files (basically the “home”
+directory created using the create_config. You’ll find my cppdef, the
+source code, etc. You have to modify the files indicated in the
+tutorial. 
+
+
+You have to download our fork or WRF (https://github.com/wrf-croco/),
+OASIS, and XIOS, and compile everything.
+
+
+Two minor details, you have the rename or link the bry files from eg
+ croco_bry_SODA342_Y2019M5.nc
+To
+croco_bry_SODA342_Y2019M05.nc
+for all months.
+
+You also have to create links to the wrf files, see loop_ln_wrf.bash
+in the same ftp.
+
+I also put a configure.wrf file, you have to activate the keys:
+-Dkey_cpp_xios  -Dkey_cpp_oasis3 -DUSE_MYDROP
+
+** Procedure
+All his file downloaded to /g/data/e14/rmh561/PAC12_croco-wrf/
+configs put under git and cleaned up (remove unneccessary files) to
+make comparisons easier.
+
+All: Modified myenv_mypath.sh appropriately.
+
+*** XIOS Compilation:
+Following instructions in README_XIOS, downloaded to
+/g/data/e14/rmh561/XIOS/. Made some X64_GADI fcm, path and env files
+in arch/ and then did ./make_xios --arch X64_GADI
+
+seems to be working...
+
+Got an error where the netcdf_par.h file was not found (i.e. netcdf4
+has not been compiled with parallel option available?). Trying again
+with the flag --netcdf_lib netcdf4_seq
+
+Failed because I made a mistake in .fcm file... Now trying again
+adding the --use_oasis oasis3_mct flag!
+
+After a few more tweaks, it worked...
+
+Does it use the XIOS files in XIOS_IN or in the base directory? They
+differ, but I don't know which ones are used? Also note that there is
+additional steps in jobcomp to do CPP pre-processing on the files in
+croco_src/XIOS/ (where another version of these files is) and copy
+them to the CROCO_IN control directory. So really there are four
+versions of these files (src, XIOS_IN, CROCO_IN and the base config
+directory) - Need to figure this all out when you compile CROCO below
+(should automatically overwrite some of the ones in the CROCO_IN
+directory - which is ok. I think the actual ones used are in
+XIOS_IN/).
+
+*** WRF Compilation:
+This needs to be done use the CROCO version of WRF. The changes in
+configure.wrf are actually not that extensive, so it may be ok. Might
+also be able to use CMS's run_compile script?
+
+Need to include XIOS and OASIS
+
+*** OASIS Compilation:
+Already done above...
+
+*** CROCO Compilation:
+Should be straight forward. Need to include XIOS and OASIS. There are
+some funny things with the XIOS input files - but they are understood
+(see above).
+
+Modified jobcomp to be consistent with my setup.
+
 * CURRENT STATUS:
-** CROCO only - got to figure out interannual forcing
-** CROCO-TOY -> would probably run if I could generate the toy input files from WRF
-** CROCO-WRF with COE WRF ERA-Interim -> ran into submitjob problems qsub
-** CROCO-WRF with CROCO WRF -> haven't tried yet.
+CROCO only - Interannual forcing with ERA5 and mercator BCs works.
+CROCO-TOY -> would probably run if I could generate the toy input files from WRF
+CROCO-WRF with COE WRF ERA-Interim -> ran into submitjob problems qsub
+CROCO-WRF with CROCO WRF -> haven't tried yet.
+
+So next steps: 
+1) basin-wide Pacific CROCO only with ERA5 and mercator? Is this
+useful, or should I stick with climatological forcing?
+2) Try to test coupling; CROCO-only ETP + WRF-only ETP with all output
+needed to make TOY inputs, then try to get an CROCO-TOY ETP going.
+3) 
