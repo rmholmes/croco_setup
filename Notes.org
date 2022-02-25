@@ -765,6 +765,10 @@ reverting to the previous version of the intel compiler that I was
 using (before Chris's updates). Everything worked with the latest
 netcdf (4.8.0), including parallel netcdf (4.8.0p). 
 
+But part of this might be because my run_compile script was submitting
+a job that was sourcing build.env rather than setup_gadi_env.sh!!!
+Fixed that and recompiled..
+
 **** Compile notes (old) dealing with errors.
 
 ***** XIOS Compilation:
@@ -955,6 +959,237 @@ OASIS. Using his provided oasis3-mct-3.0 version works
 (hopefully....). 
 
 *** Running the model
+
+Made many modifications to myjob.sh, mynamelist.sh,
+SCRIPTS_TOOLBOX/MACHINE/Linux/header.Linux for paths and options.
+
+Ran loop_ln_wrf.bash and loop_ln_croco_bry.bash to appropriately link
+the input files. 
+
+Then to run do: ./submitjob.sh
+
+This creates a directory in this folder. Now working through the many
+errors that I am running into with this...
+
+Needed the croco executable to be croco.oa not croco
+
+Missing SODA initial conditions file. But there are some restart files
+in there (npac12_spinup11_rst1.nc). I'm using one of them as an
+initial condition for now (by linking in the CROCO_FILES
+directory). So for this purpose I am using "RESTART_FLAG=TRUE" -> but
+this threw an error (I'm not seting up the restarts properly or
+something)? 
+
+Had a few errors in some scripts that I had to fix.
+
+wrfexe wasn't finding the netcdf shared libraries. So needed to add to
+LD_LIBRARY_PATH by hand in setup_gadi_env.sh. This worked, but then I
+ran into a segmentation fault. This seems to be with XIOS, potentially
+in the context files processing?
+
+Possibly steps to fix:
+- Check compile steps for netcdf includes etc; but this is probably
+  not the problem given there is no reference to netcdf in the error
+  files.
+- Check which XIOS files are used and whether they are the same as
+  Lionel used. The ones used are in XIOS_IN/
+
+I've tried using both my updated XIOS files and Lionel's ones, with
+seg faults in both cases. 
+
+Actually looks like with Lionel's files it managed to make it further,
+now running into a WRF bug (in rsl.error.0000):
+
+-------------- FATAL CALLED ---------------
+29FATAL CALLED FROM FILE:  <stdin>  LINE:    1628
+30module_physics_init.F: LANDUSE_INIT: open failure for LANDUSE.TBL
+31-------------------------------------------
+
+This was because my general WRF input files weren't being linked in
+properly. The location of these files was being set relative to where
+my WRF executables were, and this was a custom directory - it needs to
+be in main. Alternatively, change the script atm_getfile.sh (top
+section) to use a different directory.
+
+On to the next error; now it is croco_ini.nc having "scrum_time"
+instead of "ocean_time". This is because I'm trying to use a restart
+file as an initial file (I'm pretty sure). So went back to trying to
+use RESTART_FLAG=TRUE. This works for CROCO but apparently I don't
+have wrf restart files? 
+
+So basically, given what is available, I would want a CROCO restart
+and a WRF initial conditions. For now, to try to get things working, I
+am starting with a fake croco_ini.nc created from crocotools using
+SODA from 2005. The version of SODA that is coded into crocotools now
+only reaches to 2010 - so I went with 2005. 
+
+This seems to work - the model seems to have started - it just takes a
+long time to get spun-up.
+
+Need to ask Lionel about the wrf restarts.
+
+Errored because of time mismatch (as expected):
+
+bry_time limits -> 12412.54... -> 12457.54...
+360.0 days in every year!? cycle_length=0.
+
+ini - ocean_time limits -> 789004800 = day 9132.
+time since initialization, seconds.
+
+rst_1.nc - ocean_time -> 1073001600 = day 12419
+
+So I changed the time in the ini file by hand to 1073001600 (which is
+the start of 2014 given that the zero time is 1980-1-1).
+
+This worked - then ran into an incompatible HDF5 library issue - which
+was because I was sourcing the wrong environment file (build.env) in
+the WRF compile step. 
+
+As part of this I also checked whether I was using the right
+setup_gadi_env.sh in OASIS, XIOS and CROCO - yes, they were all
+consistent. Only WRF was different.
+
+Compiling WRF again...
+
+Yes seems to work fine - now XIOS is running into an error: > Error
+[CObjectFactory::GetObject(const StdString & id)] : In file
+'/g/data/e14/rmh561/XIOS-2.5/src/object_factory_impl.hpp', line 78 ->
+[ id = T_adv, U = field ] object was not found.
+
+I think this is because DIAGNOSTICS_TS is activated in cppdefs.h but
+T_adv doesn't appear in XIOS xml scripts. I've deactivated
+DIAGNOSTICS_TS and compiled CROCO again - trying again. Same error...
+
+****
+Dealing with XIOS input files:
+Recompiled CROCO with DIAGNOSTICS_TS active.
+
+Comparing Lionel's original XIOS files to my ones obtained by CROCO
+compile:
+
+iodef.xml; basically the same, uses context_croco rather than
+context_roms, and groups variables in the "xios" context rather than
+have them all separate.
+
+context_croco/context_roms: The same expect context_croco uses
+field_def_croco and domain_def_croco rather than without the _croco
+suffix, and has two lines for s_rhoS and rho_3DS.
+
+field_def/field_def_croco: field_def_croco.xml seems the better
+version to use - it's cpp processed and has T_adv (rather than
+individual components.
+
+file_def_croco.xml; A bunch of differences, but these are just where
+you define what outputs you want I think.
+
+domain_def_croco.xml/domain_def.xml: domain_def.xml has a bunch of
+extra subgrid definitions, which are also included in
+context_croco/context_roms. I'm going to try removing these in
+context_croco.xml for now.
+
+context_wrf.xml; the Toulouse version has a few extra floats defined
+(timestep, pq0, a2, a3, a4 etc.). Field definition is automatic
+apparently. domain definition is done in this file. file definition in
+file_def_wrf.xml. I'm going to retain the extra floats definitions for
+now (they can't hurt)?
+
+file_def_wrf.xml; very few differences...
+
+So list of files to include:
+iodef.xml
+  context_croco.xml
+    field_def_croco.xml
+    file_def_croco.xml
+    domain_def_croco.xml
+
+  context_wrf
+    file_def_wrf.xml
+
+Trying again with these files cleaned up (git branch
+gadi_XIOSupdated). 
+
+IT WORKSSSS!!!!!!!!!!!!!!!!!!!!!!!!!
+
+*** Working commits for all the components and configuration:
+Configuration:
+https://github.com/rmholmes/TropPacCROCO-WRF/tree/gadi
+https://github.com/rmholmes/TropPacCROCO-WRF/commit/acbbf853d7e08bf10bc4e6285e0033c5c920ff71
+
+croco base config files (e.g. setup_gadi_env.sh):
+https://github.com/rmholmes/croco_setup,
+https://github.com/rmholmes/croco_setup/commit/53807d2d96b94528708672fe3332dd2fc8662ce6
+
+WRF_croco:
+https://github.com/rmholmes/WRF/tree/gadi, 
+https://github.com/rmholmes/WRF/commit/c923dceee6f9a7773de0a5c006b347734f4baa33
+
+XIOS-2.5:
+https://github.com/rmholmes/XIOS,
+https://github.com/rmholmes/XIOS/commit/ad892f69a5504b32ba3b0678361951007f2dd68d
+
+OASIS3-MCT 3.0:
+https://github.com/rmholmes/oasis3-mct,
+https://github.com/rmholmes/oasis3-mct/commit/165942ac2fe74ecf25e92c2131764af2bc16f040
+
+CROCO code:
+https://github.com/rmholmes/croco,
+https://github.com/rmholmes/croco/commit/6050784f191cd4fec0d352c7ad2644c334a20038
+
+*** Model performance and benchmarking:
+- Pre-running phase seems to take about 15-20 mins - mostly oasis
+  setup and remapping calculations?
+- Once running:
+  100 CROCO time-steps in about 94 seconds
+  = 1 day in about 4.5 minutes
+  = 1 month in about 140 minutes / 2.3 hours
+  = 1 year in about 28 hours
+This is with 384 total cores
+216 WRF, 24 XIOS-WRF, 96 CROCO, 48 XIOS-CROCO
+
+So assuming a month takes 2.7 hours, the cost should be:
+normal: 384*2.7*2 = 2 kSU / month = 24 kSU / year
+express = 3 * normal
+
+So to run 5-year control + smoothed SST experiments is a total of
+240 kSU. That's fine.
+
+*** Model output:
+WRF output is 40GB total for the month - but there is lots of 1hr
+variables and many copied variables (see file_def_wrf.xml).  WRF
+restart is pretty negligible (500MB). All copied to the
+outputs/restarts folder.
+
+CROCO output is very large (250GB) because of lots of 3-hourly
+instantaneous outputs (not even sure why we've got these). With only
+5-day output it is about 20GB. It also did not get moved to the output
+folder for some reason - this was because OCE_XIOS_NAME was not
+properly set in mynamelist.sh. 
+
+CROCO restart is 1.4GB.
+
+ascii scripts all copied to home directory which is nice.
+
+*** Next steps:
+Email Lionel asking for:
+- Restarts - where are the WRF ones. Generally, where did the CROCO
+  restarts come from? What if I want to increase the vertical
+  resolution in the ocean -> I would have to reprocess the SODA bry
+  and IC files. Don't need to change anything in WRF (which is nice,
+  because rerunning WPS would be a pain). So ask about SODA
+  reprocessing stuff. Check vertical resolution too.
+- Think about the domain size and whether I want to change it - I am
+  actually pretty happy with it.
+- Confirm run times and performance as a check. Have they done any
+  scaling, load balancing or bottlenecks analysis? 
+- Ask about OASIS SST smoothing - is there some information on how to
+  do it somewhere? I also have Guillaume NOW files - it might be in
+  there.
+- Ask about ensembles - what are they doing? Do they need these?
+- Any questions about output size and variables -> Ask if I can get
+  their file_def_wrf and file_def_croco files again to confirm which
+  variables they are outputing (particularly for WRF, which I'm not
+  sure about).
+
 * CURRENT STATUS:
 CROCO only - Interannual forcing with ERA5 and mercator BCs works.
 CROCO-TOY -> would probably run if I could generate the toy input files from WRF
