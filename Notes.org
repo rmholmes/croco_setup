@@ -1,3 +1,4 @@
+# CROCO and CROCO-WRF notes file 2021+ for DECRA
 * General links and compilations
 ** CROCO documentation and website links:
 https://croco-ocean.gitlabpages.inria.fr/croco_doc/tutos/tutos.01.download.html
@@ -483,6 +484,7 @@ ERA5 data wasn't overlapping properly for a month and so errored in
 the last time step of the month (because it couldn't find the blk
 data). Increasing itolap_era5 from 1 to 2 in crocotools_param.m and
 rerunning make_ERA5 fixed it and I got a succesful run.
+
 
 ** PBW updated
 
@@ -1135,7 +1137,7 @@ CROCO code:
 https://github.com/rmholmes/croco,
 https://github.com/rmholmes/croco/commit/6050784f191cd4fec0d352c7ad2644c334a20038
 
-*** Model performance and benchmarking:
+** Model performance and benchmarking:
 - Pre-running phase seems to take about 15-20 mins - mostly oasis
   setup and remapping calculations?
 - Once running:
@@ -1153,7 +1155,7 @@ express = 3 * normal
 So to run 5-year control + smoothed SST experiments is a total of
 240 kSU. That's fine.
 
-*** Model output:
+** Model output:
 WRF output is 40GB total for the month - but there is lots of 1hr
 variables and many copied variables (see file_def_wrf.xml).  WRF
 restart is pretty negligible (500MB). All copied to the
@@ -1169,36 +1171,166 @@ CROCO restart is 1.4GB.
 
 ascii scripts all copied to home directory which is nice.
 
-*** Next steps:
-Email Lionel asking for:
+* PAC12_75 - ocean-only CROCO base simulation.
+This will be an ERA5 forced 1/12-degree simulation over the same PAC12
+domain with increased vertical resolution and SODA 3.4.2 lateral
+boundary conditions. 
+** To-do list:
+**** DONE Email Lionel asking for:
+     CLOSED: [2022-03-02 Wed 12:50]
 - Restarts - where are the WRF ones. Generally, where did the CROCO
-  restarts come from? What if I want to increase the vertical
-  resolution in the ocean -> I would have to reprocess the SODA bry
-  and IC files. Don't need to change anything in WRF (which is nice,
-  because rerunning WPS would be a pain). So ask about SODA
-  reprocessing stuff. Check vertical resolution too.
-- Think about the domain size and whether I want to change it - I am
-  actually pretty happy with it.
+  restarts come from (I have 5 sets)? How should I bypass the
+  RESTART_FLAG code.
+- Why did they use SODA (and why 3.4.2) rather than mercator (I have
+  mercator working).
+- Ask about SODA reprocessing for vert. res. I would need; new IC (so
+  depends on answer to previous questions), new bry. How did they use SODA3.4.2?
 - Confirm run times and performance as a check. Have they done any
-  scaling, load balancing or bottlenecks analysis? 
+  scaling, load balancing or bottlenecks analysis? Would increasing
+  the vertical resolution in the ocean have a negative effect on this?
 - Ask about OASIS SST smoothing - is there some information on how to
   do it somewhere? I also have Guillaume NOW files - it might be in
   there.
 - Ask about ensembles - what are they doing? Do they need these?
-- Any questions about output size and variables -> Ask if I can get
-  their file_def_wrf and file_def_croco files again to confirm which
-  variables they are outputing (particularly for WRF, which I'm not
-  sure about).
+- Ask if I can get their file_def_wrf and file_def_croco files again
+  to confirm which variables they are outputing (particularly for WRF,
+  which I'm not sure about).
+**** DONE Clean up setup, notes for running (compilation already done) and directories
+     CLOSED: [2022-03-02 Wed 12:50]
+**** DONE Check ocean parameters and make notes (mixing, vert res. etc.)
+     CLOSED: [2022-03-03 Thu 15:08]
+***** Vertical resolution:
+In PAC12 50 level it's ~5m at the surface decreasing almost linearly
+to ~30m at 250m.  
 
-* CURRENT STATUS:
-CROCO only - Interannual forcing with ERA5 and mercator BCs works.
-CROCO-TOY -> would probably run if I could generate the toy input files from WRF
-CROCO-WRF with COE WRF ERA-Interim -> ran into submitjob problems qsub
-CROCO-WRF with CROCO WRF -> haven't tried yet.
+In Cherian et al. MITgcm (1/20-degree) we had 325
+levels with 1m at the surface.  
 
-So next steps: 
-1) basin-wide Pacific CROCO only with ERA5 and mercator? Is this
-useful, or should I stick with climatological forcing?
-2) Try to test coupling; CROCO-only ETP + WRF-only ETP with all output
-needed to make TOY inputs, then try to get an CROCO-TOY ETP going.
-3) 
+In the 1/20-degree ROMS used in HT15 and Whitt 2021 we had 50 levels
+with about 8m in the upper 100m (check the stretching parameters). 
+
+I think I want at least 75, possibly 100 levels. But I also need to
+think about the changes to the vertical viscosity that need to be
+made.
+
+Plotting 50, 75 and 100 levels indicates I don't get that much more
+going to 100 levels. With 75 levels I have 2.5-3m at surface, 5m at
+50m, 8m at 100m and 15m at 200m. That's fine.
+
+***** Mixing parameters:
+K0 = 5e-3 maximum diffusivity due to shear
+Ri0 = 0.7
+1e-5 interior diffusivity. 
+I used K0=2e-3 for HT15, but otherwise consistent.
+
+Viscosity; in HT15 and PAC12 used 1e-4 background value (plus BL and
+shear). I guess this is ok?
+
+**** DONE Checkout output variables - e.g. many time-independent
+     CLOSED: [2022-03-03 Thu 16:57]
+  quantities are coming out as time dependent (e.g. Vtransform). Why
+  is "operation="once"" not working?
+
+**** DONE ERA5 forcing:
+     CLOSED: [2022-03-03 Thu 16:44]
+bulk forcing options: I think I should just use the v1.2 defaults that
+I used for Benguela_LR?
+
+Do I want the SW diurnal cycle analytical?
+
+time resolution:
+Everything is hourly except LSM and SST which are daily.
+
+**** DONE Think about whether h needs to be different with different vertical resolution
+     CLOSED: [2022-03-03 Thu 15:08]
+I'm happy to go on without worrying about this.
+**** TODO Test 1 month offline ERA5 run
+**** TODO Implement online ERA5 forcing for production runs
+**** TODO Run CROCO 5-year 2014 spinup.
+**** TODO Run a control 5-year 2014-2018 CROCO-only simulation
+**** TODO Run a control 5-year 2014-2018 CROCO-WRF simulation
+** Procedure
+Edit create_config for PAC12_75 and run.
+git init/commit.
+edit various scripts for consistency with PAC12.
+
+Question with cppdefs.h: It should be SFLUX_CFB - I kept this as
+opposed to Lionel's SMFLUX_CFB.
+
+Need to ask about the surface forcing for ERA5 forced run. I must use
+BULK_FLUX - but are the settings correct?
+
+*** Pre-processing:
+**** Grid file and general setup:
+Horizontal resolution: PAC12 is from 175.3ish to 290.6ish, -15.5ish to
+20.2ish. That's big enough for me -> use their grid file. So copied
+PAC12/croco_npac12_v2_InterpOnSODAgrd.nc to
+PAC12_75/croco_grd.nc. This was probably created with WRF and if I
+want the configurations to be consistent this is what makes the most
+sense. It is in fact about 1/13-degree resolution, rather than
+1/12. But it makes sense to use this.
+
+Linked directory in scratch PAC12_75 to CROCO_FILES in
+/g/data/e14/rmh561/croco/data/CROCO_FILES/PAC12_75/
+
+**** SODA 3.4.2 ini and bry processing
+
+Made script "download_SODA342.bash" to download SODA3.4.2 data
+following readme.txt from Lisa. Downloading data (about 20GB/year,
+this is global).
+
+Modified script "process_SODA342_outputs.csh" to extract monthly data
+over just the region of interest and save to the same file.
+
+Modified matlab script "add_UVbar.m" to add barotropic velocities and
+then save back into new files again in same directory. Run with matlab
+"start; add_UVbar;".
+
+Also did the same for the last month of 2013 and the first month of
+2019 to have some overlap.
+
+Once done - run loop_ln_croco_bry.bash to correct file names %02.
+
+**** ERA5 forcing
+
+Copied ERA5_configs from Benguela_LR and modified paths etc. in
+era5_crocotools_param.py. Then do "python ERA5_request.py". With
+crocotools_param is downloading from 172 to 297-degrees (ok), -20 to
+24 (ok). It takes about 20 mins for 1 month, so it will take about 20
+hours to download it all... (set running on a detached screen on
+rmh561@gadi-login-06).
+
+Then do "python ERA5_convert.py".
+
+Then add Aforc_ERA5 to start.m and do qsub make_ERA5.sub; which runs
+matlab with "start;make_ERA5;" to make the blk_ERA5* files. This is
+also very slow...
+
+This is creating very large files (50GB/file - so 3TB of files). It
+would be better to do the processing online (do offline first for 2
+months, then try).
+
+**** XIOS 
+in PREPRO/XIOS run ./process_xios_xml.sh
+
+This creates and populates the XIOS_IN folder. The resulting files are
+almost completely consistent with those in PAC12 with some
+improvements. I will need to modify file_def_croco.xml for my output
+(TBC).
+**** Compile CROCO
+./jobcomp > jobcomp.log 
+
+Had to deal with some issues with XIOS being compiled with OASIS. See
+changes to jobcomp and jobcomp.log. Otherwise worked fine.
+*** Running:
+
+All the above done for 2013-12 -> 2014-02 and then a one-month test
+run was attempted. ./submitjob.sh
+* PAC12_75_CPL - coupled CROCO-WRF simulation
+
+This will be a CROCO-WRF 1/12-degree simulation initialized from
+PAC12_75 CROCO-only run
+** To-do list:
+**** TODO Run a control 5-year 2014-2018 CROCO-WRF simulation
+** Procedure
+

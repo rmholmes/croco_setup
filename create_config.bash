@@ -24,7 +24,7 @@ TOOLS_DIR=~/croco/croco_tools_src
 
 # Configuration name
 # ------------------
-MY_CONFIG_NAME=test_config
+MY_CONFIG_NAME=PAC12_75
 
 # Home and Work configuration directories
 # ---------------------------------------
@@ -40,7 +40,8 @@ MY_CONFIG_WORK=~/croco/croco_scratch
 #options=( all-prod )
 
 ## example for production run architecture and coupling with external models :
-options=( all-prod-cpl )
+#options=( all-prod-cpl )
+options=(oce-prod xios oanalysis prepro)
 
 # List of known options: 
 LIST_OPTIONS=$(cat << EOF
