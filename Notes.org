@@ -15,6 +15,10 @@ page for tutorials/instructions.
 CMS OASIS wiki: http://climate-cms.wikis.unsw.edu.au/Using_Oasis
 COSIMA OASIS?? https://github.com/COSIMA/oasis3-mct
 
+** XIOS links:
+A reference with tags:
+https://www.nemo-ocean.eu/doc/node75.html
+
 * CROCO v1.1 tutorials and initial runs, with some WRF/OASIS
 ** CROCO-only run (climatological forcing, Benguela):
 -------------------------------------------------
@@ -1281,6 +1285,7 @@ The problem was the MPI version -
 **** DONE Validate 2014 10-year spinup.
      CLOSED: [2022-04-13 Wed 13:59]
 **** TODO Run a control 10-year 2014-2018 CROCO-only simulation
+**** TODO Make a gdata syncing script
 ** Experiment table
 | Name   | Description
 | exp1   | 2014 spin-up year 1
@@ -1501,7 +1506,9 @@ If not, contact NCI to examine a hung job. They have more access. In
 particular Ben Menadue.
 
 Changing to openmpi/4.0.1 instead of 4.0.2 for XIOS and CROCO seems to
-have done the trick and fixed this.
+have done the trick and fixed this. Spoke too soon, I don't think it
+has - actually, maybe this is linked to XIOS alone (see below in
+Control run for next steps).
 
 *** First spin-up: Procedure
 
@@ -1543,11 +1550,73 @@ inconsistency being the change to VADV_ADAPT_IMP in the second year.
 *** First spin-up: Validation
 
 See 2014_Validation. Looks ok. I'm a bit worried about the deep
-EUC. Compare to ACCESS-OM2? 
+EUC. This is also deeper than ACCESS-OM2-025 and ACCESS-OM2-01. Why?
+Too much mixing higher in the water column.
+
+The EUC magnitude looks consistent with other model solutions (SODA,
+ACCESS-OM2) but about 50m deeper than in TAO.
+
+The NECC is much better than ACCESS-OM2. In fact, the profile of SSH
+is much better in CROCO than in ACCESS-OM2 - I guess because the mean
+is subtracted off this really is because of the significant lack of an
+NECC trough.
 
 *** 2014-2019 Control run:
 
-Update XIOS output:
+Testing: See "Notes on XIOS diagnostics below" and the
+PAC12_75_XIOStest branch commit messages.
+
+Setup for a 1 year run in 2014 with more diagnostics.
+
+** Notes on diagnostics (XIOS and hanging issue):
+
+Update XIOS output: Trying a one-month test run with increased XIOS
+output (multiple different files), initialized for 2014 from the end
+of exp10.
+
+I run into the hanging error again if I try to play with the XIOS .xml
+files. There is some issue here. Need to nail down exactly what it
+is.
+
+It appears to be with the 1-day average (or 3-day average) block in
+file_def_croco.xml. When this is commented out it works. Could the
+problem be to do with the @exp_@... thing? Trying without that (its
+accounted for in the folder names anyway!).  Yes this seems to work -
+but then runs into the same variable name issue again, and this is
+even with that file disabled!!! What the hell is going on here?
+
+For some reason everything keeps going into the same file - that's why
+the name issue comes up. Why can't I separate out the files? There's
+some inheritance issue going on.
+
+The issue is with copying the field_group id. I guess id's have to be
+separate for everything. This fixes it. In fact, you don't even need
+to give id's -> I guess these are only for referring back to the same
+group?
+
+However, I still get a hanging issue if I try to do this with the full
+file...
+
+So I guess I have to build things up gradually to figure out what the
+problems are....
+
+When using operation="once" files you still need to provide a
+output_freq (just pick 1h).
+
+DIAGNOSTICS_TS_ADV allows you to switch between flux-form and
+divergence form for advection terms.
+
+What is DIAGNOSTICS_TSVAR??
+
+T_adv/S_adv didn't exist - needed to make in field_def...
+
+The variable names in XIOS .xml files are case sensitive.
+
+The variables are all defined in croco_src/XIOS/send_xios_diags.F They
+don't all exist (e.g. the components of advection).
+
+I think I've got something that works now...
+
 * PAC12_75_CPL - coupled CROCO-WRF simulation
 
 This will be a CROCO-WRF 1/12-degree simulation initialized from
