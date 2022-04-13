@@ -6,13 +6,13 @@ module purge
 module use ~access/modules
 
 module load intel-compiler/2019.5.281
-module load openmpi/4.0.2
+module load openmpi/4.0.1
 module load netcdf/4.8.0p
 module load hdf5/1.10.7p
 
 # The following are apparently required for XIOS-2.5:
 module load fcm
-module load drhook/1.1_ompi.4.0.2
+module load drhook/1.1_ompi.4.0.1
 module load grib-api
 module load libpng
 module load openjpeg

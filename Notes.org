@@ -1172,9 +1172,9 @@ CROCO restart is 1.4GB.
 ascii scripts all copied to home directory which is nice.
 
 * PAC12_75 - ocean-only CROCO base simulation.
-This will be an ERA5 forced 1/12-degree simulation over the same PAC12
+This is an ERA5 forced 1/12-degree simulation over the same PAC12
 domain with increased vertical resolution and SODA 3.4.2 lateral
-boundary conditions. 
+boundary conditions.
 ** To-do list:
 **** DONE Email Lionel asking for:
      CLOSED: [2022-03-02 Wed 12:50]
@@ -1244,12 +1244,66 @@ Everything is hourly except LSM and SST which are daily.
 **** DONE Think about whether h needs to be different with different vertical resolution
      CLOSED: [2022-03-03 Thu 15:08]
 I'm happy to go on without worrying about this.
-**** TODO Test 1 month offline ERA5 run
-**** TODO Implement online ERA5 forcing for production runs
-**** TODO Run CROCO 5-year 2014 spinup.
-**** TODO Run a control 5-year 2014-2018 CROCO-only simulation
-**** TODO Run a control 5-year 2014-2018 CROCO-WRF simulation
+**** DONE Test 1 month offline ERA5 run
+     CLOSED: [2022-03-09 Wed 12:36]
+**** DONE Implement online ERA5 forcing for production runs
+     CLOSED: [2022-03-09 Wed 12:36]
+**** DONE Fix hanging error - why? Compile with debugging? It's croco I think
+     CLOSED: [2022-04-13 Wed 13:59]
+Debugging doesn't seem to give me much of a hint... The error trace
+is:
+forrtl: error (78): process killed (SIGTERM)
+Image              PC                Routine            Line        Source             
+crocox             00000000015F8294  Unknown               Unknown  Unknown
+libpthread-2.28.s  0000147219B25C20  Unknown               Unknown  Unknown
+hmca_bcol_ucx_p2p  00001471F2A67190  Unknown               Unknown  Unknown
+libhcoll.so.1.0.1  00001471FCBDD0EC  hmca_coll_ml_barr     Unknown  Unknown
+mca_coll_hcoll.so  00001471FCED8CDA  mca_coll_hcoll_ba     Unknown  Unknown
+libmpi.so.40.20.2  000014721AEEBA28  MPI_Barrier           Unknown  Unknown
+libmpi_mpifh.so    0000147219D7C983  Unknown               Unknown  Unknown
+crocox             00000000004209C0  MAIN__                    588  main_.f
+crocox             000000000041ADE2  Unknown               Unknown  Unknown
+libc-2.28.so       0000147219771493  __libc_start_main     Unknown  Unknown
+crocox             000000000041ACEE  Unknown               Unknown  Unknown
+
+The problem was the MPI version - 
+
+**** DONE Fix shflux flux bug - recompile with changed croco name
+     CLOSED: [2022-03-11 Fri 10:12]
+**** DONE Figure out SST bugs
+     CLOSED: [2022-03-11 Fri 10:10]
+**** TODO Figure out MPI_NOLAND option
+**** TODO Do some more detailed profilling
+**** DONE Email Lisa asking about ONLINE option
+     CLOSED: [2022-03-15 Tue 08:33]
+**** DONE Run CROCO 10-year 2014 spinup.
+     CLOSED: [2022-04-13 Wed 13:59]
+**** DONE Validate 2014 10-year spinup.
+     CLOSED: [2022-04-13 Wed 13:59]
+**** TODO Run a control 10-year 2014-2018 CROCO-only simulation
+** Experiment table
+| Name   | Description
+| exp1   | 2014 spin-up year 1
+| exp2   | 2014 spin-up year 2 (initialized from end of exp1) - note change of vertical advection scheme to VADV_ADAPT_IMP at month 4. 
+| exp3   | 2014 spin-up year 3
+| exp4   | 2014 spin-up year 4
+| exp5   | 2014 spin-up year 5
+| exp6   | 2014 spin-up year 6
+| exp7   | 2014 spin-up year 7
+| exp8   | 2014 spin-up year 8
+| exp9   | 2014 spin-up year 9
+| exp10  | 2014 spin-up year 10
+| exp11  | 2014-2018 Control simulation (XIOS output updated)
+
+** Data products:
+We are using SODA3.4.2 (Carton et al. 2018 J Climate), which is
+effecively MOM5 (ocean sea-ice version of CM2.5) forced with ERA
+Interim and assimilation T-S profiles and satellite SSH/SST.
+
+ERA-5 is used for surface forcing (citation?).
+
 ** Procedure
+*** Configs setup
 Edit create_config for PAC12_75 and run.
 git init/commit.
 edit various scripts for consistency with PAC12.
@@ -1310,6 +1364,9 @@ This is creating very large files (50GB/file - so 3TB of files). It
 would be better to do the processing online (do offline first for 2
 months, then try).
 
+ONLINE works fine - see below. Conversion to CROCO variable types
+already done with ERA5_convert.py.
+
 **** XIOS 
 in PREPRO/XIOS run ./process_xios_xml.sh
 
@@ -1322,10 +1379,175 @@ improvements. I will need to modify file_def_croco.xml for my output
 
 Had to deal with some issues with XIOS being compiled with OASIS. See
 changes to jobcomp and jobcomp.log. Otherwise worked fine.
-*** Running:
-
+*** Running, parallel settings and performance:
 All the above done for 2013-12 -> 2014-02 and then a one-month test
 run was attempted. ./submitjob.sh
+
+Ran into a weird permissions error (needed chmod u+x
+SCRIPTS_TOOLBOX/*.sh). 
+
+croco executable needed to be croco.frc - renamed.
+
+Worked through another few errors (e.g. initial file not properly
+named)!
+
+Default (PAC12) is 12*8 = 96, + 48 XIOS cores.
+Grid is 1600 * 500, so a tile is 133*62. 
+ACCESS-OM2-025 is 1824 processors for. 1455 ocean, for 1440*1080 with
+tiling of 48*40 (so 30*27). 
+
+Queues: normal - 48/192GB, broadwell -> 28/256GB.
+
+So sticking with 48 XIOS cores. 32*10 = 320. XIOS cores should be
+1/10-1/50th of NEMO cores (according to
+https://www.nemo-ocean.eu/doc/node75.html), so if I do 16 XIOS cores I
+get 7 nodes on normal (320 + 16 = 336 = 7*48). On normalbw I can do
+the same (320 + 16 = 336 = 12 * 28). Let's do broadwell - it's
+cheaper. So conclusion:
+Try 32 * 10 = 320, +16 XIOS cores (TBC if XIOS is too low). 
+
+Updated GADI scripts to do things properly with memory usage etc.
+
+Is the hanging issue (just before main time stepping) a random
+Gadi-related error (e.g. on certain nodes?). Or do I have to have
+compiling folder and executable the same.
+
+Trying also ERA-online interpolation of forcing files; activate ONLINE
+and ERA_ECMWF in cppdefs.h, set OCE_FILES_ONLINEDIR in
+myenv_mypath.sh, change interponline and frc_ext in
+mynamelist.sh. This worked, after a few changes to some
+scripts. Doesn't seem to slow things down at all...
+
+Writing of restarts seems very slow... I don't think this is XIOS! ->
+it only deals with output, which seems fine. It didn't seem like it
+was writing the restart in parallel - but it might be writing the
+output files in parallel? Trying instead with NC4PAR - Yes this fixed
+it easily.
+
+
+**** Performance/scaling table:
+
+| Name          | NX*NY  | XIOS | TOT | Tile   | queue    | s/100ts | hr/365d | SU/365 day | Notes | 
+| PAC12 default | 12*8   | 48   | 144 | 133*62 | normal   | 
+| 16*8          | 16*8   | 12   | 140 | 100*62 | normalbw | 80      | 23.36   | 4088       | 
+| 32*10         | 32*10  | 16   | 336 | 50*50  | normalbw | 35.9    | 10.48   | 4401       |
+| 24*9          | 24*9   | 8    | 224 | 66*55  | normalbw | 
+| 48*15         | 48*15  | 36   | 756 | 33*33  | normalbw | 19.5    | 5.7     | 5386       | 15 min (3 day run time for XIOS)
+| 48*15         | 48*15  | 64   | 784 | 33*33  | normalbw | 19.5    | 5.7     | 5386       | 13.6 min (3 day run time for XIOS)
+| 32*10 (44)    | 32*10  | 44   | 364 | 50*50  | normalbw | 35.04   | 10.23   | 4650       | 29 min total walltime for 12 day run (12 day run, 7 mins for restart file creation).
+| 32*10 E5o     | 32*10  | 44   | 364 | 50*50  | normalbw | 34      | 9.92    | 4513       | 
+| 32*10 E5o NC4 | 32*10  | 44   | 364 | 50*50  | normalbw | 34      | 9.92    | 4513       | 5:23 walltime for 3 day run.
+| 32*10 E5o NC4 | 32*10  | 16   | 336 | 50*50  | normalbw | 34      | 9.92    | 4513       | 
+| 32*10 E5o NC4 | 32*10  | 44   | 364 | 50*50  | normalbw | 34.7    | 10.13   | 4609       | 2:32 for 3m =~ 10h/year.
+| 48*15 E5o NC4 | 48*15  | 36   | 756 | 33*33  | normalbw | 19.5    | 5.7     | 5386       | 1:18 for 3m =~ 5.3h/year at cost of 5052SU/year great!
+
+*** First spin-up run: Problems
+Ran into problems:
+
+**** Ran into an annoying problem with the oce_getbdy.sh script that,
+   for multiple-month runs, concatenates the bry files of multiple
+   months into a single file. This wasn't behaving as expected because
+   it expected monthly-averaged boundary forcing files and I had 5-day
+   averages. Fixed by hard-coding the time ranges into this file (it
+   should throw an error if this at any time doesn't work).
+
+**** Problem with ONLINE option: There is some problem - SST seems way
+   too high. Outputing shflx's to see why - but there is a problem
+   with the total shflux vs. shflx - I need to figure this out. Easy
+   solution would be to change the CROCO code variable name to shflx
+   from shflux.
+
+The problem is with the ONLINE option. With this option the wind
+stress is way to weak - some units issue? Comparing croco_blk and the
+raw files they seem to match - so it's somewhere in the code. 
+
+BULK_LW - should this be on or not?
+
+Started blk_ERA5 processing as backup... Should do for 2014 at least
+so I can get the spin-up going....
+
+Looks like without online forcing you can't run jobs for more than a
+month...
+
+Turns out that the ONLINE option bug was a bug, and has been fixed
+with croco v1.2.1. This has been downloaded and I'm reverting back to
+ONLINE version (much easier than running only a month at a time with
+the hanging bug).
+
+**** Bulk fluxes:
+Also, I did not have the current feedback activated. I have now
+activated SFLUX_CFB in cppdefs.h.
+
+On the bulk fluxes; in OA_COUPLED mode BULK_FLUX is deactivated -
+i.e. all the fluxes are determined by WRF.
+
+**** XIOS issues; why do I need different variable names in different
+files/output frequencies? That's frustrating...
+
+**** Hanging issue
+
+Seems pretty regular, and similar on normal and normalbw. I received
+the following from Paola:
+
+It's possible that is a MPI error, Random MPI errors are very
+difficult  debug.  Also seems you are running an IO server
+(xios_server.exe) which complicates debugging a great deal.
+
+A few things to try:
+- Different MPI compilers
+- Switching to normal.
+
+If not, contact NCI to examine a hung job. They have more access. In
+particular Ben Menadue.
+
+Changing to openmpi/4.0.1 instead of 4.0.2 for XIOS and CROCO seems to
+have done the trick and fixed this.
+
+*** First spin-up: Procedure
+
+Run successfully with ONLINE and CFB activated for a year in 3 month
+chunks (about 2.5 hours per chunk with 32*10). 
+
+Setup for second year: 
+
+mkdir rundir/PAC12_75_exp2_restarts
+mkdir rundir/PAC12_75_exp2_restarts/20131231
+cp rundir/PAC12_75_exp1_restarts/20141231/croco_rst_20141231.nc rundir/PAC12_75_exp2_restarts/20131231/croco_rst_20131231.nc
+ncap2 -A -s scrum_time=1073001600 rundir/PAC12_75_exp2_restarts/20131231/croco_rst_20131231.nc rundir/PAC12_75_exp2_restarts/20131231/croco_rst_20131231.nc
+
+Also added u_sq and v_sq diagnostics for KE calculation during
+spin-up.
+
+Still couldn't figure out XIOS multiple file same variable problem -
+something wrong with my xml file format?
+
+For third year I will run with 48*15 (36 XIOS) as its faster and not
+much more expensive. I've set this up for a year.
+
+It errored at the end of the year because it couldn't find forcing for
+2015M01 (T2M) - which is weird since the file was there and linked
+in. Reverted to 3 month block runs.
+
+Lionel suggests going to VADV_ADAPT_IMP because it gets around some
+Courant number issues in the vertical advection and should be more
+stable (so I can increase the time step??). I've started this for the
+2nd 3 month block of the 2nd spin-up year.
+
+Changing to openmpi/4.0.1 instead of 4.0.2 for XIOS and CROCO
+compilation may have solved the hanging issue. I'm 2 out of 2 so far
+new runs.
+
+Successfully run 10 years of this spinup (exp01-exp10), with the only
+inconsistency being the change to VADV_ADAPT_IMP in the second year.
+
+*** First spin-up: Validation
+
+See 2014_Validation. Looks ok. I'm a bit worried about the deep
+EUC. Compare to ACCESS-OM2? 
+
+*** 2014-2019 Control run:
+
+Update XIOS output:
 * PAC12_75_CPL - coupled CROCO-WRF simulation
 
 This will be a CROCO-WRF 1/12-degree simulation initialized from
