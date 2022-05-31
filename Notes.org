@@ -1180,6 +1180,16 @@ This is an ERA5 forced 1/12-degree simulation over the same PAC12
 domain with increased vertical resolution and SODA 3.4.2 lateral
 boundary conditions.
 ** To-do list:
+**** TODO Figure out MPI_NOLAND option
+**** TODO Write script to delete job and resubmit automatically when hanging
+**** DONE Put together mixing experiments
+     CLOSED: [2022-05-19 Thu 11:40]
+**** DONE Run 2015-2018 for analysis
+     CLOSED: [2022-05-13 Fri 08:01]
+**** DONE Make a gdata syncing script
+     CLOSED: [2022-05-13 Fri 08:01]
+**** DONE Validate 2014 high-freq output
+     CLOSED: [2022-04-21 Thu 13:24]
 **** DONE Email Lionel asking for:
      CLOSED: [2022-03-02 Wed 12:50]
 - Restarts - where are the WRF ones. Generally, where did the CROCO
@@ -1276,16 +1286,12 @@ The problem was the MPI version -
      CLOSED: [2022-03-11 Fri 10:12]
 **** DONE Figure out SST bugs
      CLOSED: [2022-03-11 Fri 10:10]
-**** TODO Figure out MPI_NOLAND option
-**** TODO Do some more detailed profilling
 **** DONE Email Lisa asking about ONLINE option
      CLOSED: [2022-03-15 Tue 08:33]
 **** DONE Run CROCO 10-year 2014 spinup.
      CLOSED: [2022-04-13 Wed 13:59]
 **** DONE Validate 2014 10-year spinup.
      CLOSED: [2022-04-13 Wed 13:59]
-**** TODO Run a control 10-year 2014-2018 CROCO-only simulation
-**** TODO Make a gdata syncing script
 ** Experiment table
 | Name   | Description
 | exp1   | 2014 spin-up year 1
@@ -1299,6 +1305,66 @@ The problem was the MPI version -
 | exp9   | 2014 spin-up year 9
 | exp10  | 2014 spin-up year 10
 | exp11  | 2014-2018 Control simulation (XIOS output updated)
+| exp12  | 2014+ PP81 simulation with PP81 interior shear replacing KPP interior shear
+** Performance/scaling table (relatively old):
+Time step = 300 seconds
+Grid size = 1600 * 502
+| Name          | NX*NY  | XIOS | TOT | Tile   | queue    | s/100ts | hr/365d | SU/365 day | Notes | 
+| PAC12 default | 12*8   | 48   | 144 | 133*62 | normal   | 
+| 16*8          | 16*8   | 12   | 140 | 100*62 | normalbw | 80      | 23.36   | 4088       | 
+| 32*10         | 32*10  | 16   | 336 | 50*50  | normalbw | 35.9    | 10.48   | 4401       |
+| 24*9          | 24*9   | 8    | 224 | 66*55  | normalbw | 
+| 48*15         | 48*15  | 36   | 756 | 33*33  | normalbw | 19.5    | 5.7     | 5386       | 15 min (3 day run time for XIOS)
+| 48*15         | 48*15  | 64   | 784 | 33*33  | normalbw | 19.5    | 5.7     | 5386       | 13.6 min (3 day run time for XIOS)
+| 32*10 (44)    | 32*10  | 44   | 364 | 50*50  | normalbw | 35.04   | 10.23   | 4650       | 29 min total walltime for 12 day run (12 day run, 7 mins for restart file creation).
+| 32*10 E5o     | 32*10  | 44   | 364 | 50*50  | normalbw | 34      | 9.92    | 4513       | 
+| 32*10 E5o NC4 | 32*10  | 44   | 364 | 50*50  | normalbw | 34      | 9.92    | 4513       | 5:23 walltime for 3 day run.
+| 32*10 E5o NC4 | 32*10  | 16   | 336 | 50*50  | normalbw | 34      | 9.92    | 4513       | 
+| 32*10 E5o NC4 | 32*10  | 44   | 364 | 50*50  | normalbw | 34.7    | 10.13   | 4609       | 2:32 for 3m =~ 10h/year.
+| 48*15 E5o NC4 | 48*15  | 36   | 756 | 33*33  | normalbw | 19.5    | 5.7     | 5386       | 1:18 for 3m =~ 5.3h/year at cost of 5052SU/year great!
+** Performance/scaling table (new):
+Time step = 300 seconds
+Grid size = 1600 * 502
+In the first section below nXIOS was chosen large so that I/O was not a bottle neck (it may have been for the very largest below).
+| NX*NY  | TOTC | XIOS | TOT  | Tile    | qu | s/100ts     |
+| 8*3    | 24   | 32   | 56   | 200*167 | bw | 618.7 (/10) |
+| 17*5   | 85   | 55   | 140  | 94*100  | bw | 130.4       |
+| 26*8   | 208  | 72   | 280  | 61*63   | bw | 54.3        |
+| 33*10  | 330  | 118  | 448  | 49*50   | bw | 37.6        |
+| 39*12  | 468  | 120  | 588  | 41*42   | bw | 26.5 (*2)   |
+| 43*13  | 559  | 197  | 756  | 37*39   | bw | 23.1 (*2)   |
+| 48*15  | 720  | 176  | 896  | 33*33   | bw | 19.0 (*2)   |
+| 52*16  | 832  | 232  | 1064 | 31*31   | bw | 16.3 (*4)   |
+| 55*17  | 935  | 269  | 1204 | 29*30   | bw | 14.83 (*4)  |
+| 59*19  | 1121 | 251  | 1372 | 27*26   | bw | 12.44 (*5)  |
+| 71*22  | 1562 | 286  | 1848 | 23*23   | bw | 9.8   (*10) | Note: May have been some I/O bottleneck - some pauses in log
+| 89*28  | 2492 | 560  | 3052 | 18*18   | bw | 7.2   (*20) | " as above.
+| ------------------------------------------------------------
+| 8*3    | 24   | 28   | 56   | 200*167 | bw | 560   (/10) | No output. 
+| 17*5   | 85   | 28   | 140  | 94*100  | bw | 117  (/2)   |
+| 26*8   | 208  | 28   | 280  | 61*63   | bw | 47.8        |
+| 39*12  | 468  | 28   | 588  | 41*42   | bw | 23.0 (*3)   |
+| 48*15  | 720  | 28   | 896  | 33*33   | bw | 16.1 (*5)   |
+| 59*19  | 1121 | 28   | 1372 | 27*26   | bw | 11.2 (*5)   |
+| 71*22  | 1562 | 28   | 1590 | 23*23   | bw | 7.9   (*10) | 
+| 89*28  | 2492 | 28   | 2520 | 18*18   | bw | 5.9   (*20) | 9:57 walltime (so 6.69s with initialization)
+| ---------------------------------------------------------- s/31 days (wallt) | CPU-HR/year |
+| 48*15  | 720  | 8    | 728  | 33*33   | bw |             | Can't seem to get this one working... always hangs...
+| 48*15  | 720  | 10   | 738  | 33*33   | bw |             | or this one...
+| 48*15  | 720  | 18   | 738  | 33*33   | bw |             | 1788 (20.02)    | 4316 | 
+| 48*15  | 720  | 36   | 756  | 33*33   | bw | 19.0 (*2)   | 1788 (20.02)    | 4421 |
+| 48*15  | 720  | 64   | 784  | 33*33   | bw |             | 1798 (20.14)    | 4610 |
+| 71*22  | 1562 | 18   | 1580 | 23*23   | bw |             | "
+| 71*22  | 1562 | 34   | 1596 | 23*23   | bw |             | Likewise, doesn't seem to run... Something about XIOS memory?
+| 71*22  | 1562 | 62   | 1624 | 23*23   | bw |             | "
+| 71*22  | 1562 | 80   | 1652 | 23*23   | bw |             | "
+| 71*22  | 1562 | 108  | 1670 | 23*23   | bw |             | 962 (10.8)  / 897 -> these numbers mean nothing... | 5254 |
+| 71*22  | 1562 | 136  | 1698 | 23*23   | bw |             | 914 (10.2)      | 5076 |
+| 71*22  | 1562 | 164  | 1726 | 23*23   | bw |             | 907 (10.2)      | 5120 |
+| 71*22  | 1562 | 164  | 1726 | 23*23   | bw |             | 922 (...)
+
+Best configuration (with XIOS and initialization/finalization):
+48*15=720 + 36 = 756. Cost of about 4500 CPU-hr/year (5600 SUs on broadwell) at 5.9 hours/year.
 
 ** Data products:
 We are using SODA3.4.2 (Carton et al. 2018 J Climate), which is
@@ -1429,23 +1495,6 @@ was writing the restart in parallel - but it might be writing the
 output files in parallel? Trying instead with NC4PAR - Yes this fixed
 it easily.
 
-
-**** Performance/scaling table:
-
-| Name          | NX*NY  | XIOS | TOT | Tile   | queue    | s/100ts | hr/365d | SU/365 day | Notes | 
-| PAC12 default | 12*8   | 48   | 144 | 133*62 | normal   | 
-| 16*8          | 16*8   | 12   | 140 | 100*62 | normalbw | 80      | 23.36   | 4088       | 
-| 32*10         | 32*10  | 16   | 336 | 50*50  | normalbw | 35.9    | 10.48   | 4401       |
-| 24*9          | 24*9   | 8    | 224 | 66*55  | normalbw | 
-| 48*15         | 48*15  | 36   | 756 | 33*33  | normalbw | 19.5    | 5.7     | 5386       | 15 min (3 day run time for XIOS)
-| 48*15         | 48*15  | 64   | 784 | 33*33  | normalbw | 19.5    | 5.7     | 5386       | 13.6 min (3 day run time for XIOS)
-| 32*10 (44)    | 32*10  | 44   | 364 | 50*50  | normalbw | 35.04   | 10.23   | 4650       | 29 min total walltime for 12 day run (12 day run, 7 mins for restart file creation).
-| 32*10 E5o     | 32*10  | 44   | 364 | 50*50  | normalbw | 34      | 9.92    | 4513       | 
-| 32*10 E5o NC4 | 32*10  | 44   | 364 | 50*50  | normalbw | 34      | 9.92    | 4513       | 5:23 walltime for 3 day run.
-| 32*10 E5o NC4 | 32*10  | 16   | 336 | 50*50  | normalbw | 34      | 9.92    | 4513       | 
-| 32*10 E5o NC4 | 32*10  | 44   | 364 | 50*50  | normalbw | 34.7    | 10.13   | 4609       | 2:32 for 3m =~ 10h/year.
-| 48*15 E5o NC4 | 48*15  | 36   | 756 | 33*33  | normalbw | 19.5    | 5.7     | 5386       | 1:18 for 3m =~ 5.3h/year at cost of 5052SU/year great!
-
 *** First spin-up run: Problems
 Ran into problems:
 
@@ -1568,6 +1617,9 @@ PAC12_75_XIOStest branch commit messages.
 
 Setup for a 1 year run in 2014 with more diagnostics.
 
+10/5/2022: Analysis seems ok. Continuing for another 4 years to end
+of 2018 (with slightly reduced diagnostics).
+
 ** Notes on diagnostics (XIOS and hanging issue):
 
 Update XIOS output: Trying a one-month test run with increased XIOS
@@ -1617,11 +1669,363 @@ don't all exist (e.g. the components of advection).
 
 I think I've got something that works now...
 
+** PP81 mixing experiment
+
+Added code in PP81. Setup to simply swap this for the interior KPP
+scheme. Seems to work pretty well. Definitely has cleaner
+fields. Changes are modest but significant (what about compared to
+biases??).
+
 * PAC12_75_CPL - coupled CROCO-WRF simulation
-
-This will be a CROCO-WRF 1/12-degree simulation initialized from
-PAC12_75 CROCO-only run
+CROCO-WRF 1/12-degree simulation initialized from PAC12_75 CROCO-only
+run
 ** To-do list:
-**** TODO Run a control 5-year 2014-2018 CROCO-WRF simulation
-** Procedure
+**** TODO Figure out what SST is used in the Atlantic.
+**** DONE Figure out SST-smoothing remapping
+     CLOSED: [2022-05-23 Mon 12:41]
+**** TODO Run a no current feedback simulation?
+**** TODO LOAD BALANCING - optimize
+**** DONE Validate control 2014
+     CLOSED: [2022-05-20 Fri 12:01]
+**** TODO Write script to delete job and resubmit automatically when hanging
+**** TODO Some issue with AVX in the broadwell nodes - I can't use them?
+**** DONE Think about WRF output
+     CLOSED: [2022-05-13 Fri 08:01]
+**** DONE Run control 2015-2018
+     CLOSED: [2022-05-13 Fri 08:00]
+**** DONE Write gdata syncing script
+     CLOSED: [2022-05-13 Fri 08:01]
+**** DONE Update scripts to PAC12_75 (e.g. MACHINE options)
+     CLOSED: [2022-04-20 Wed 15:19]
+**** DONE Run control 2014
+     CLOSED: [2022-04-21 Thu 13:24]
+** Experiment table
+| Name   | Description
+| exp01  | 2014 year 1
+| exp02  | 2015-2018 production Control run
+| exp03  | 2014+ smooth SST run (Gaussian longitude filter).
+** Performance/scaling:
+OCN time step = 300 seconds
+ATM time step = 30 seconds
+Coupling frequency = 3600 seconds
+OCN grid = 1600 * 502
+ATM grid = 522 * 168
+| Name      | OCN/XIOS/TOT | OCN T  | ATM/XIOS/TOT | ATM T | TOT | queue    | s/100ts | hr/365d | SU/365d | 1m full job timing
+| PAC12 def | 12*8/48/144  | 133*62 | 18*12/24/240 | 29*14 | 384 | normal   | 105     | 30.7    | 23600   | 2:58 =~ 35.6h/year at 27kSU/year
+| PAC12 n2  | 20*8/32/192  | 80*62  | 29*12/36/384 | 18*14 | 576 | normal   | 62.5    | 18.25   | 21000   | 1:38 =~ 19.6h/year at 23kSU/year
+| PAC12 n3  | 20*8/32/192  | 80*62  | 29*14/26/432 | 18*12 | 624 | normal   | 62.05   | 18.12   | 22600   | 1:36 =~ 19.2h/year at 24kSU/year
+| PAC12 n4  | 32*10/16/336 | 50*50  | 29*14/26/432 | 18*12 | 768 | normal   | 53.1    | 15.5    | 23800   | 1:23 =~ 16.6h/year at 25.5kSU/year
+NOTE: The PAC12 n4 seems to pause every hour. I only have ATM output every hour. Not enough ATM XIOS processors?
+| PAC12 n5  | 25*8/24/224  | 64*62  | 29*14/42/448 | 18*12 | 672 | normal   | 55      | 16.06   | 21500   | 1:27.5 =~ 17.5h/year at 23.5kSU/year
+This one hung once...
 
+The second number in the option NLOGPRT in namcouple allows me to
+output time statistics. Try it! 
+
+Can also use the Lucia tool by setting this to -1. This seems like
+it'd be the best way to check load-balancing. Check util/lucia/README
+in oasis3-mct directory.
+
+To run: in /g/data/e14/rmh561/croco/src/oasis3-mct/util/lucia do:
+source ~/croco/setup_gadi_env.sh
+lucia -c
+Produces lucia.exe
+
+** Performance/scaling updated:
+OCN time step = 300 seconds
+ATM time step = 30 seconds
+Coupling frequency = 3600 seconds
+OCN grid = 1600 * 502
+ATM grid = 522 * 168
+All below on 2-day run on cascade lake (normal/express):
+| ATM       | ATM X |  OCN     | OCN X | s/100ts | hr/365d | CPU-hr/yr | LUC A | LUC O | LUC A W | LUC O W | CPU-hr/yr (LUC A) |
+| 29*14=406 | 42    | 25*8=200 | 24    | 52.2    | 15.2    |           | 286.0 | 271.3 | 0.02    | 14.64   | 9743
+| 29*14=406 | 42    | 25*8=200 | 24    | 52.8    | 15.4    |           | 286.9 | 272.1 | 0.01    | 14.76   | 9773
+| 32*12=384 | 48    | 25*8=200 | 40    |         |         |           | 355.4 | 269.2 | 0.02    | 86.2    | 12107
+| 29*14=406 | 58    | 26*8=208 | 48    | 54.0    |         |           | 287.8 | 267.3 | 0.01    | 20.5    | 10504
+| 29*14=406 | 34    | 26*8=208 | 24    |         |         |           | 288.5 | 263.3 | 0.01    | 25.08   | 9828
+| 29*14=406 | 34    | 24*7=168 | 16    | 59.0    |         |           | 288.7 | 322.5 | 33.84   | 0.02    | 10201
+| 29*14=406 | 66    | 25*8=200 | 48    |         |         |           | 288.3 | 269.2 | 0.01    | 19.1    | 10522
+| 29*14=406 | 38    | 25*8=200 | 30    |         |         |           | 290.0 | 273.4 | 0.01    | 16.52   | 9908
+| 29*14=406 | 46    | 25*8=200 | 20    |         |         |           | 287.9 | 269.5 | 0.01    | 18.31   | 9807
+
+Best configuration :
+29*14=406 + 42 + 25*8=200 + 24 = 672. Cost of about 11000 CPU-hr/year (22kSU on normal) at 16.4 hours/year
+
+83/31+3*81/30+3*84/31 = 16.43 hours/year
+Cost = 11040 CPU-hr/year
+
+** Procedure
+*** Initial setup
+Cloned PAC12 original setup into PAC12_75_cpl in ~/croco
+
+Setup directories:
+mkdir /scratch/e14/rmh561/croco/PAC12_75_cpl
+cd /scratch/e14/rmh561/croco/PAC12_75_cpl
+mkdir CROCO_Compile
+mkdir rundir
+mkdir /g/data/e14/rmh561/croco/data/CROCO_FILES/PAC12_75_cpl
+ln -s /g/data/e14/rmh561/croco/data/WRF_FILES/PAC12 /g/data/e14/rmh561/croco/data/WRF_FILES/PAC12_75_cpl
+ln -s /g/data/e14/rmh561/croco/data/CROCO_FILES/PAC12_75_cpl CROCO_FILES
+ln -s /g/data/e14/rmh561/croco/data/WRF_FILES/PAC12_75_cpl WRF_FILES
+
+Setup CROCO inputs:
+
+Run loop_ln_croco_bry_cpl.bash to link in SODA boundary files from PAC12_75.
+
+cd /g/data/e14/rmh561/croco/data/CROCO_FILES/PAC12_75_cpl/
+ln -s /g/data/e14/rmh561/croco/data/CROCO_FILES/PAC12_75/croco_grd_PAC12.nc croco_grd.nc
+cp /g/data/e14/rmh561/croco/archive/PAC12_75/PAC12_75_exp10/croco_rst_20141231.nc ./croco_rst_20131231.nc
+ncap2 -A -s scrum_time=1073001600 croco_rst_20131231.nc croco_rst_20131231.nc
+ln croco_rst_20131231.nc CROCO_rst_Y2014M01.nc
+
+Change lots of paths in config files.
+
+Fix WRF data links:
+cd /g/data/e14/rmh561/croco/src/WRF/WRF/data/
+rm *
+cp --symbolic-link ../run/*
+rm *.exe
+
+*** Recompile
+
+OASIS:
+In /g/data/e14/rmh561/croco/src/oasis3-mct
+cp -r build/* build_backup_pre19-04-2022/
+cd util/make_dir
+cp ~/croco/setup_gadi_env.sh ./
+source setup_gadi_env.sh
+make -f TopMakefileOasis3 BUILDROOT=$PWD
+
+XIOS:
+Already done with new setup_gadi_env.sh
+
+CROCO:
+cd CROCO_IN/
+./jobcomp > jobcomp.log
+
+WRF:
+cd /g/data/e14/rmh561/croco/src/WRF/
+Update paths in configure.wrf
+./run_compile
+
+*** Running procedure
+
+./submitjob.sh
+
+Ran into a problem where the time variable that the code wanted in the
+CROCO restart was ocean_time, but the file only had scrum_time. This
+is because the SCRIPTS_TOOLBOX is the old version of CROCO and this
+hadn't been updated. I updated by hand.
+
+Having fixed that I got it working with a few other minor changes.
+
+Checked consistency with PAC12_75 - all good.
+
+Updated/cleaned XIOS CROCO diagnostics - all good after replacing
+radsw - swrad (one works with BULK_FLUXES, one without) and the
+components of shflx (these are all calculated in WRF so not provided
+individually).
+
+** Smoothing SST
+
+I need to:
+*** 1) Generate a remapping file rmp_ocnt_to_atmt_SMOOTH.nc file: 
+**** The rmp file details
+In the normal run, we use SCRIPR as an option in namcouple which
+automatically generates the default rmp_ocnt_to_atmt_DISTWGT.nc file.
+
+To understand this file:
+
+num_links -> number of associated source and target grid point pairs
+(for the standard run which uses 4 nearest neighbours distrance
+weighted interpolation DISTWGT, this is a bit less than the
+dst_grid_size=87676 * 4, with the bit less than arrising from the
+masking).
+
+src_address -> 1D array of size num_links with source address
+dst_address -> 1D array of size num_links with destination address
+remap_matrix -> num_links*num_wgts contains the weights associated
+with each link. 
+
+There are also a bunch of other variables associated with "corners"
+and "rank" - but perhaps these are only used for conservative
+interpolation? 
+
+There is also the BILINEAR and BICUBIC options instead of DISTWGT -
+but I don't think these can do smoothing (not sure)?
+
+There is more information on these in the "SCRIPusers.pdf" of the
+oasis3-mct/docs folder.
+
+The scrip code has a test function the uses your input remapping file
+to generate a source and destination array that is output as a netcdf
+file - so this will be useful for testing.
+
+**** Understanding Sebastien's IDL script: 
+
+Actually it might not be too hard, I think I only need to modify the
+"smooth atm values..." section to change the smoothing.
+
+Input arguments:
+- fileo -> croco_grd.nc containing (xi_rho, eta_rho, lon_rho, lat_rho,
+           mask_rho). 
+- filea -> A wrf grid file containing west_east and south_north IDs
+  and XLONG_M or XLONG and XLAT_M or XLAT (where does this come from?)
+
+- filecpla -> .nc file containing CPLMASK (which I can take from a WRF
+  output file). 
+
+- filesst -> netcdf file containing SST for testing.
+
+sig -> Gaussian smoothing width in integer grid points.
+cutratio -> Some rule about how large the weights have to be to keep
+them. 
+dmax -> Approximate distance in degrees between one atm point and its
+4 closest ocean neighbours.
+
+**** Setup and running Sebastien's IDL script:
+mkdir /g/data/e14/rmh561/croco/data/OASIS_FILES/PAC12_75_cpl/
+cd /g/data/e14/rmh561/croco/data/OASIS_FILES/PAC12_75_cpl/
+ln -s /g/data/e14/rmh561/croco/data/CROCO_FILES/PAC12_75/croco_grd_PAC12.nc croco_grd.nc
+ln -s /g/data/e14/rmh561/croco/data/WRF_FILES/PAC12/wrfinput_d01_2014_01 wrf_grd.nc
+ncrcat -v temp_surf -d time_counter,0,1 /g/data/e14/rmh561/croco/archive/PAC12_75_cpl/PAC12_75_cpl_exp02/20170101_20170131/croco_out_day.nc sst.nc
+
+Modified paths in the script.
+
+Downloaded Sebastien's scripts to /g/data/e14/rmh561/croco/src/SAXO
+(has inquad, quadrilateral2square, etc. etc.):
+svn checkout http://forge.ipsl.jussieu.fr/saxo/svn/trunk/SRC SAXO/SRC
+Downloaded Sebastien's init.pro script and modified paths.
+
+Base script are in ~/croco/PAC12_75_cpl/OASIS_IN/. TO run, use the pbs
+submission script make_wgt.sub (see inside for details and IDL
+commands).
+
+Modified script to use a narrow Gaussian in y. This could probably be
+done much better. 
+*** 2) modify namcouple to use this file
+TO do this, I just need to use a single transformation and the MAPPING
+keyword. E.g. I think for SST the following would work:
+
+Normal (to generate rmp_ocnt_to_atmt_DISTWGT.nc):
+-------
+
+CROCO_SST WRF_d01_EXT_d01_SST 1 3600 1 oce.nc EXPORTED
+1599 503 522 168 ocnt atmt LAG=300
+R  0  R  0
+SCRIPR
+DISTWGT LR SCALAR LATLON 1 4
+
+Custom remapping using file rmp_ocnt_to_atmt_SMOOTHSST.nc:
+--------------
+CROCO_SST WRF_d01_EXT_d01_SST 1 3600 1 oce.nc EXPORTED
+1599 503 522 168 ocnt atmt LAG=300
+R  0  R  0
+MAPPING
+rcmp_ocnt_to_atmt_SMOOTH.nc dst
+
+What do I use for this last? Probably dst (will be quicker/larger
+tiles?). Also consider the optional additional option bfb, sum or
+opt. sum or opt might be much faster than bfb (sacraficing some
+round-off error).
+
+Note: the masks.nc, grids.nc and areas.nc files are not needed when
+using a custom remapping file.
+
+*** 3) modify setup scripts to link in this remap file
+I just added some code at the bottom of SCRIPTS_TOOLBOX/cpl_nam.sh to
+link all rmp*.nc files in $CWORK/OASIS_FILES (which itself is linked
+from scratch to gdata). 
+*** RANDOM NOTES:
+**** ACCESS-OM2
+In access-om2, the namcouple contains minimal detailed because:
+
+- CICE and MOM use the same grid and same time-step, so no remapping
+  is needed (no transformations needed, so the 3rd last argument is 0
+  and no options are given below). Note that o2i.nc and i2o.nc are the
+  oasis restart files for the LAG and SEQ arguments.
+- For atm -> cice we pre-calculate the remapping weights files and
+  then use the "MAPPING" transformation as our only
+  transformation. The options to this are the remapping weights file
+  and . (Except for river runoff which doesn't need a remapping
+  weights file, at least not in namcouple/oasis - no transformations
+  used). 
+
+NOTE: we're not using conservative remapping for heat flux atm->ocn.
+
+* PAC12_75_wrf - WRF only
+Setup a WRF-only configuration initially just for scaling
+calculations, but could be useful later on...
+** To-do list
+*** TODO Setup to use CROCO or CROCO-WRF SST as an input?
+*** DONE Profiling with no output
+    CLOSED: [2022-05-31 Tue 09:09]
+*** TODO Test XIOS impact on profiling
+** Procedure
+In mynamelist.sh turn off USE_OCE and USE_XIOS_OCE.
+Setup myjob.sh with required settings.
+Change myenv_mypath.sh CONFIG!!
+
+mkdir /scratch/e14/rmh561/croco/PAC12_75_wrf
+cd /scratch/e14/rmh561/croco/PAC12_75_wrf
+mkdir rundir
+cd /g/data/e14/rmh561/croco/data/WRF_FILES
+ln -s PAC12 PAC12_75_wrf
+cd /scratch/e14/rmh561/croco/PAC12_75_wrf
+ln -s /g/data/e14/rmh561/croco/data/WRF_FILES/PAC12_75_wrf WRF_FILES
+
+Need to recompile WRF in uncoupled mode and then properly link in
+these executables - see script changes.
+
+Need to do "./clean -a" first...
+
+Also need to compile XIOS without OASIS... But this does not work. So
+now I'm trying without XIOS...
+
+Without XIOS output is determined as follows: 
+There are 2 ways to do this:
+
+1) Go into the WRF/Registry/Registry.EM_COMMON file, and then look for
+the variables you don't want. You can remove the ‘h’ from out I/O
+column. But you need to recompile with a ./clean -a
+2) Use the runtime io option, as described here
+https://www2.mmm.ucar.edu/wrf/users/docs/user_guide_v4/v4.1/users_guide_chap5.html#runtimeio
+
+For now I'm just setting the output frequency to be very low.
+
+** Performance/scaling:
+ATM time step = 30 seconds
+ATM grid = 522 * 168
+1051.2
+| nx * ny  | TOT | TILE      | queue    | s/1000ts | hr/365d | cost (SU*hr/year) |
+| 11 * 4   | 44  | 47.4 * 42 | express  | 426.0    | 124     | 5456              |
+| 16 * 6   | 96  | 33 * 28   |          | 198.0    | 58      | 5568              |
+| 24 * 6   | 144 | 22 * 28   |          | 140.0    | 41      | 5904              |
+| 30 * 8   | 240 | 17 * 21   |          | 85.9     | 25      | 6000              |
+| 32 * 12  | 384 | 16 * 14   |          | 53.3     | 15.6    | 5990              |
+| 29 * 14  | 406 | 18 * 12   | "        | 50.9     | 14.9    | 6049              |
+| 40 * 12  | 480 | 13 * 14   |          | 48.3     | 14.1    | 6768
+| 48 * 13  | 624 | 11 * 13   |          | 41.0     | 12.0    | 7488
+| 48 * 16  | 768 | 11 * 10.5 |          | 36.0     | 10.5    | 8064
+
+| 18 * 12  | 216 | 29 * 14   | "        | 82.4     | 24.0    | 5184
+
+522 factors: 2, 3, 6, 9, 18, 29, 58, 87, 174, 261
+168 factors: 2, 3, 4, 6, 7, 8, 12, 14, 21, 24, 28, 42, 56, 84
+
+Best configuration:
+29*14=406 = 
+
+* Analysis 
+** to-do list:
+*** DONE Nino 3.4 time series (seasonal and deseasoned)
+    CLOSED: [2022-05-20 Fri 12:02]
+*** DONE Snapshots of filtered SST, shflx etc. anomalies
+    CLOSED: [2022-05-25 Wed 15:53]
+*** TODO Other time series (TIWKE, TIWTVAR, domain-integrated wind work)
+*** TODO coupling coefficients (TC analysis)
+*** TODO heat, zonal momentum and TIWKE budgets
+*** TODO Temperature variance budgets (TIWTV)?
+*** TODO Wavenumber spectra (take code from NumMix paper).
+*** TODO PP81: Vertical structure later years
