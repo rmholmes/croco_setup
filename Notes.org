@@ -1176,9 +1176,6 @@ CROCO restart is 1.4GB.
 ascii scripts all copied to home directory which is nice.
 
 * PAC12_75 - ocean-only CROCO base simulation.
-This is an ERA5 forced 1/12-degree simulation over the same PAC12
-domain with increased vertical resolution and SODA 3.4.2 lateral
-boundary conditions.
 ** To-do list:
 **** TODO Figure out MPI_NOLAND option
 **** TODO Write script to delete job and resubmit automatically when hanging
@@ -1306,22 +1303,6 @@ The problem was the MPI version -
 | exp10  | 2014 spin-up year 10
 | exp11  | 2014-2018 Control simulation (XIOS output updated)
 | exp12  | 2014+ PP81 simulation with PP81 interior shear replacing KPP interior shear
-** Performance/scaling table (relatively old):
-Time step = 300 seconds
-Grid size = 1600 * 502
-| Name          | NX*NY  | XIOS | TOT | Tile   | queue    | s/100ts | hr/365d | SU/365 day | Notes | 
-| PAC12 default | 12*8   | 48   | 144 | 133*62 | normal   | 
-| 16*8          | 16*8   | 12   | 140 | 100*62 | normalbw | 80      | 23.36   | 4088       | 
-| 32*10         | 32*10  | 16   | 336 | 50*50  | normalbw | 35.9    | 10.48   | 4401       |
-| 24*9          | 24*9   | 8    | 224 | 66*55  | normalbw | 
-| 48*15         | 48*15  | 36   | 756 | 33*33  | normalbw | 19.5    | 5.7     | 5386       | 15 min (3 day run time for XIOS)
-| 48*15         | 48*15  | 64   | 784 | 33*33  | normalbw | 19.5    | 5.7     | 5386       | 13.6 min (3 day run time for XIOS)
-| 32*10 (44)    | 32*10  | 44   | 364 | 50*50  | normalbw | 35.04   | 10.23   | 4650       | 29 min total walltime for 12 day run (12 day run, 7 mins for restart file creation).
-| 32*10 E5o     | 32*10  | 44   | 364 | 50*50  | normalbw | 34      | 9.92    | 4513       | 
-| 32*10 E5o NC4 | 32*10  | 44   | 364 | 50*50  | normalbw | 34      | 9.92    | 4513       | 5:23 walltime for 3 day run.
-| 32*10 E5o NC4 | 32*10  | 16   | 336 | 50*50  | normalbw | 34      | 9.92    | 4513       | 
-| 32*10 E5o NC4 | 32*10  | 44   | 364 | 50*50  | normalbw | 34.7    | 10.13   | 4609       | 2:32 for 3m =~ 10h/year.
-| 48*15 E5o NC4 | 48*15  | 36   | 756 | 33*33  | normalbw | 19.5    | 5.7     | 5386       | 1:18 for 3m =~ 5.3h/year at cost of 5052SU/year great!
 ** Performance/scaling table (new):
 Time step = 300 seconds
 Grid size = 1600 * 502
@@ -1367,13 +1348,22 @@ In the first section below nXIOS was chosen large so that I/O was not a bottle n
 Best configuration (with XIOS and initialization/finalization):
 48*15=720 + 36 = 756. Cost of about 4500 CPU-hr/year (5600 SUs on broadwell) at 5.9 hours/year.
 
-** Data products:
-We are using SODA3.4.2 (Carton et al. 2018 J Climate), which is
-effecively MOM5 (ocean sea-ice version of CM2.5) forced with ERA
-Interim and assimilation T-S profiles and satellite SSH/SST.
-
-ERA-5 is used for surface forcing (citation?).
-
+*** Performance/scaling table (relatively old):
+Time step = 300 seconds
+Grid size = 1600 * 502
+| Name          | NX*NY  | XIOS | TOT | Tile   | queue    | s/100ts | hr/365d | SU/365 day | Notes | 
+| PAC12 default | 12*8   | 48   | 144 | 133*62 | normal   | 
+| 16*8          | 16*8   | 12   | 140 | 100*62 | normalbw | 80      | 23.36   | 4088       | 
+| 32*10         | 32*10  | 16   | 336 | 50*50  | normalbw | 35.9    | 10.48   | 4401       |
+| 24*9          | 24*9   | 8    | 224 | 66*55  | normalbw | 
+| 48*15         | 48*15  | 36   | 756 | 33*33  | normalbw | 19.5    | 5.7     | 5386       | 15 min (3 day run time for XIOS)
+| 48*15         | 48*15  | 64   | 784 | 33*33  | normalbw | 19.5    | 5.7     | 5386       | 13.6 min (3 day run time for XIOS)
+| 32*10 (44)    | 32*10  | 44   | 364 | 50*50  | normalbw | 35.04   | 10.23   | 4650       | 29 min total walltime for 12 day run (12 day run, 7 mins for restart file creation).
+| 32*10 E5o     | 32*10  | 44   | 364 | 50*50  | normalbw | 34      | 9.92    | 4513       | 
+| 32*10 E5o NC4 | 32*10  | 44   | 364 | 50*50  | normalbw | 34      | 9.92    | 4513       | 5:23 walltime for 3 day run.
+| 32*10 E5o NC4 | 32*10  | 16   | 336 | 50*50  | normalbw | 34      | 9.92    | 4513       | 
+| 32*10 E5o NC4 | 32*10  | 44   | 364 | 50*50  | normalbw | 34.7    | 10.13   | 4609       | 2:32 for 3m =~ 10h/year.
+| 48*15 E5o NC4 | 48*15  | 36   | 756 | 33*33  | normalbw | 19.5    | 5.7     | 5386       | 1:18 for 3m =~ 5.3h/year at cost of 5052SU/year great!
 ** Procedure
 *** Configs setup
 Edit create_config for PAC12_75 and run.
@@ -1684,12 +1674,41 @@ run
 **** TODO Figure out what SST is used in the Atlantic.
 **** DONE Figure out SST-smoothing remapping
      CLOSED: [2022-05-23 Mon 12:41]
-**** TODO Run a no current feedback simulation?
-**** TODO LOAD BALANCING - optimize
+**** DONE Run a no current feedback simulation?
+     CLOSED: [2022-06-27 Mon 17:41]
+**** DONE LOAD BALANCING - optimize
+     CLOSED: [2022-06-27 Mon 17:41]
 **** DONE Validate control 2014
      CLOSED: [2022-05-20 Fri 12:01]
-**** TODO Write script to delete job and resubmit automatically when hanging
+**** TODO Clean-up smoothing script to use no depth in y.
+**** TODO Tweak smoothing script to only smooth over a specified region
+**** TODO Come up with a better way to keep track of executables with hashes.
 **** TODO Some issue with AVX in the broadwell nodes - I can't use them?
+**** DONE Fix DIAGNOSTICS_EDDY and include eddy terms by default.
+     CLOSED: [2022-06-29 Wed 17:10]
+**** DONE Write script to delete job and resubmit automatically when hanging
+     CLOSED: [2022-06-29 Wed 17:10]
+Note: On a non-WRF-restart run it will take 20 mins to create the
+OASIS remapping files. This will occur when croco.log is at the line:
+      GET_INITIAL: Restarted from day =  12419.0000 rec=   1(  840961,  20,****).
+and there are no output files (either wrf or croco).
+
+Something like doing the MPI_LAUNCH step in the job script as a
+background job (with &) and then sleeping a specified time then
+checking might work?
+
+I think this is what I want: https://unix.stackexchange.com/questions/637002/how-do-i-foreground-a-job-in-a-script
+
+Basically: 
+Have some option that activates the following check set:
+- put main job in background with known PID
+- Wait a specified time
+- Check whether "MAIN: time stepping..." exists:
+  - if not, wait some more.
+  - if yes, then check if the first title line of stats exists.
+    - if not: Kill PID
+    - if yes: Put main job back in foreground.
+
 **** DONE Think about WRF output
      CLOSED: [2022-05-13 Fri 08:01]
 **** DONE Run control 2015-2018
@@ -1702,10 +1721,17 @@ run
      CLOSED: [2022-04-21 Thu 13:24]
 ** Experiment table
 | Name   | Description
-| exp01  | 2014 year 1
-| exp02  | 2015-2018 production Control run
-| exp03  | 2014+ smooth SST run (Gaussian longitude filter).
-| exp04  | As for exp03 except initialized from end of PAC12_75_exp08.
+| exp01  | 2014 year 1 - note: Output linked into exp02.
+| exp02  | 2015-2018 production Control run (started from exp10end)
+| exp03  | 2014+ smooth SST run (Gaussian longitude filter), started from exp10end
+| exp04  | Smooth-SST E2: As for exp03 except initialized from end of PAC12_75_exp08 (exp8end).
+| exp05  | PP81 mixing scheme (initialized from 2014), started from exp10end.
+| exp06  | No current feedback experiment - full, started from exp10end.
+| exp07  | No mesoscale current feedback - pass smoothed UOCE/VOCE toatmosphere, started from exp10end.
+| exp08  | Control E2, initialized from exp8end.
+| exp09  | Control E3, initialized from exp9end.
+| exp10  | Control E4, initialized from exp7end.
+| exp11  | Control E5, initialized from exp6end.
 ** Performance/scaling:
 OCN time step = 300 seconds
 ATM time step = 30 seconds
@@ -1756,6 +1782,59 @@ Best configuration :
 
 83/31+3*81/30+3*84/31 = 16.43 hours/year
 Cost = 11040 CPU-hr/year
+
+** Model details: Data products, parameterizations etc.
+
+We are using SODA3.4.2 (Carton et al. 2018 J Climate), which is
+effecively 1/4-degree MOM5 (ocean sea-ice version of CM2.5) forced
+with ERA Interim and assimilation T-S profiles and satellite
+SSH/SST. We use 5-daily output. It may not be ideal as the SEC seems
+particularly bad (i.e. basically eastward surface velocities even
+though we are not dominated by El Nino?).
+
+ERA-5 is used for surface forcing and atmospheric BCs (Hersbach
+2022). It has a horizontal resolution of 31km (basically 1/4-degree)
+and data at hourly frequency. Uses 4D-var.
+
+I think the atmospheric BCs are only at 6-hourly resolution? But in
+forced mode it uses hourly data.
+
+Parameterizations, physics, numerics: 
+CROCO: 
+- Open BCs W,N,S using boundary forcing (no nudging layer). No river
+  inputs, no tides.
+- 3rd-order upwind horizontal momentum with no explicit horizontal viscosity.
+- 3rd-order upwind rotated horizontal tracer advection with no
+  explicit horizontal diffusivity.
+- Semi-implicit vertical tracer and momentum advection using spplines
+  (Shchepetkin 2015 OM).
+- KPP vertical mixing (no double diffusion or Langmuir, both BBL and
+  SML, convection and non-local).
+Ocean-only version:
+- Update bulk fluxes (COARE3p0). 
+- Current feedback -> CFB_STRESS and CFB_Wind_TRA. These are the
+wind-stress correction method based on the stress-correction (section
+3.4.2 of Renault et al. 2020). The second is a tracer flux correction
+(i.e. heat flux) just to correction the wind speed used in the heat
+flux calculation?
+
+WRF (see WRF_src: WRF/run/README.namelist).
+- micro-physics: WSM 6-class graupal. 
+- Long-wave physics: Goddard longwave scheme (Chou et al. 2001, https://esrl.noaa.gov/gsd/wrfportal/namelist_input_options.html))
+- Short-wave physics: Goddard shortwave scheme
+- Surface layer: M-O similarity
+- Land-surface model: Noah land-surface model.
+- Boundary layer physics: YSU scheme.
+- Cumulus/convection physics: Multi-scale Kain-Fritsch scheme (Zheng
+et al. 2016 MWR, https://esrl.noaa.gov/gsd/wrfportal/namelist_input_options.html).
+- No shallow cumulus.
+
+extra note: We are also using "MY_DROP" - which uses a climatological
+droplet size rather than a constant size (Lionel's explanation). 
+
+Some extra notes:
+Lisa sent me some validatin they did for a few runs comparing cu11 (as
+above) and cu14. 
 
 ** Procedure
 *** Initial setup
@@ -1966,11 +2045,24 @@ used for exp01 and exp03 in
 /g/data/e14/rmh561/croco/data/CROCO_FILES/PAC12_75_cpl/ to
 croco_rst_20131231_exp10end.nc. Then for the new ensemble I copied
 /g/data/e14/rmh561/croco/archive/PAC12_75/PAC12_75_exp08/croco_rst_20141231.nc
-to croco_rst_20131231_exp08end.nc and linked croco_rst_Y2014M01.nc to
-that file instead.
+to croco_rst_20131231_exp08end.nc, did the ncap2 replace scrum_time
+thing and then linked croco_rst_Y2014M01.nc to that file instead.
 
 This was setup and run as exp04 (out of a different control directory
 cpl-2).
+
+I've also setup 4 control run ensembles to do the same.
+
+** PP81 coupled run
+Easily setup using exp05. Note be careful with executables.
+** Current feedback runs
+
+exp06 setup to run with no current feedback. This simply involves
+removing the lines in namcouple that pass UOCE/VOCE to the
+atmosphere.
+
+exp07 setup to run with no mesoscale current feedback. This simply
+involves passing the smoothed UOCE/VOCE to the atmosphere. 
 
 * PAC12_75_wrf - WRF only
 Setup a WRF-only configuration initially just for scaling
@@ -2041,52 +2133,31 @@ Best configuration:
 
 Using nccompress I'm getting a factor of about 57% with compression.
 * Analysis 
-** to-do list:
-*** DONE Nino 3.4 time series (seasonal and deseasoned)
-    CLOSED: [2022-05-20 Fri 12:02]
-*** DONE Snapshots of filtered SST, shflx etc. anomalies
-    CLOSED: [2022-05-25 Wed 15:53]
-*** DONE Other time series (TIWKE, TIWTVAR, domain-integrated wind work)
-    CLOSED: [2022-06-10 Fri 15:58]
+** to-do list (coupled):
+*** TODO More comprehensive wind work and EKE/MKE analysis
+*** TODO BT/BC conversion terms and EKE budget in general
 *** TODO coupling coefficients (TC analysis)
-*** TODO heat, zonal momentum and TIWKE budgets
+*** TODO atmospheric analysis - how far do the anomalies extend
+*** TODO heat budget - to understand V'T' and disentangle TIWTV changes (direct or through enhanced stirring?)
 *** TODO Temperature variance budgets (TIWTV)?
 *** TODO Wavenumber spectra (take code from NumMix paper).
-*** TODO PP81: Vertical structure later years
-** Sequence for Toulouse:
-*** Validation (CROCO and CROCO-WRF):
-**** DONE Global scalars
-     CLOSED: [2022-06-15 Wed 02:06]
-**** DONE Nino 3.4 time series
-     CLOSED: [2022-06-15 Wed 02:06]
-**** DONE SST, SSS and SSH biases (mean and seasonal cycles along equator).
-     CLOSED: [2022-06-15 Wed 02:06]
-**** DONE TIWEKE and variance
-     CLOSED: [2022-06-15 Wed 18:54]
-**** DONE Vertical structure along equator.
-     CLOSED: [2022-06-15 Wed 18:54]
-*** Smooth-SST CROCO-WRF
-**** DONE Nino 3.4 - focus on end of 2016.
-     CLOSED: [2022-06-15 Wed 18:53]
-**** DONE Surface variable and heat flux snapshots
-     CLOSED: [2022-06-15 Wed 18:54]
-**** DONE TIW temperature variance and velocity variance
-     CLOSED: [2022-06-15 Wed 18:54]
-**** DONE Meridional heat flux (just surface, or with depth)?
-     CLOSED: [2022-06-15 Wed 18:54]
-**** TODO Wavenumber spectra?
-**** TODO T-lat space budgets?
-**** TODO Some indication of vertical mixing changes?
-*** PP81 experiment:
-**** TODO Mean surface state changes
-**** TODO Vertical structure changes
-**** TODO Modulation TIW changes
+*** TODO Better understand SSH variance results - What about vertical structure?
+*** TODO Plot net LW flux from coupled simulations?
+*** TODO Compare different reanalyses: ORAS5, SODA and Glorys.
+*** TODO T-lat space budgets?
+*** TODO Some indication of vertical mixing changes in TFB/CFB runs.
+** to-do list (mixing):
+*** TODO Add TAO obs once longer time period.
+*** TODO Quantify hanges in TIW modulation
+*** TODO Quantify rectification?
+*** TODO Understand the vertical structure results
 * Discussion with Sebastien 15/6/2022
 
 Validation:
 - Do comparison to TAO with proper times. It's interesting the
-vertical structure at the surface. Is this real? How does it compare
-with TAO?
+  vertical structure at the surface. Is this real? How does it compare
+  with TAO? Is SODA actually really bad in having an eastward surface
+  velocity over this time period?
 - Compare winds between coupled and forced - are these responsible for
 the SST biases we see?
 
@@ -2126,6 +2197,7 @@ budget?
 
 We didn't discuss the SST subsampling issue with the gaussian filter -
 but I really don't think it's an issue.
+
 
 
 
