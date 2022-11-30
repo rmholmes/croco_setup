@@ -1178,7 +1178,8 @@ ascii scripts all copied to home directory which is nice.
 * PAC12_75 - ocean-only CROCO base simulation.
 ** To-do list:
 **** TODO Figure out MPI_NOLAND option
-**** TODO Write script to delete job and resubmit automatically when hanging
+**** DONE Write script to delete job and resubmit automatically when hanging
+     CLOSED: [2022-11-17 Thu 10:04]
 **** DONE Put together mixing experiments
      CLOSED: [2022-05-19 Thu 11:40]
 **** DONE Run 2015-2018 for analysis
@@ -1671,6 +1672,7 @@ biases??).
 CROCO-WRF 1/12-degree simulation initialized from PAC12_75 CROCO-only
 run
 ** To-do list:
+**** TODO Rerun noTWB and noMesoscaleCFB simulations with masked smoothing.
 **** TODO Figure out what SST is used in the Atlantic.
 **** DONE Figure out SST-smoothing remapping
      CLOSED: [2022-05-23 Mon 12:41]
@@ -1680,8 +1682,10 @@ run
      CLOSED: [2022-06-27 Mon 17:41]
 **** DONE Validate control 2014
      CLOSED: [2022-05-20 Fri 12:01]
-**** TODO Clean-up smoothing script to use no depth in y.
-**** TODO Tweak smoothing script to only smooth over a specified region
+**** DONE Clean-up smoothing script to use no depth in y.
+     CLOSED: [2022-11-21 Mon 13:48]
+**** DONE Tweak smoothing script to only smooth over a specified region
+     CLOSED: [2022-11-21 Mon 13:48]
 **** TODO Come up with a better way to keep track of executables with hashes.
 **** TODO Some issue with AVX in the broadwell nodes - I can't use them?
 **** DONE Fix DIAGNOSTICS_EDDY and include eddy terms by default.
@@ -1720,9 +1724,11 @@ Have some option that activates the following check set:
 **** DONE Run control 2014
      CLOSED: [2022-04-21 Thu 13:24]
 ** Experiment table
+Note on branches: All general updates should be done on PAC12_75_cpl
+branch (kept up to date), this is effectively "main".
 | Name   | Description
 | exp01  | 2014 year 1 - note: Output linked into exp02.
-| exp02  | 2015-2018 production Control run (started from exp10end)
+| exp02  | 2015-2018 production Control run (started from PAC12_75, exp10end)
 | exp03  | 2014+ smooth SST run (Gaussian longitude filter), started from exp10end
 | exp04  | Smooth-SST E2: As for exp03 except initialized from end of PAC12_75_exp08 (exp8end).
 | exp05  | PP81 mixing scheme (initialized from 2014), started from exp10end.
@@ -1732,6 +1738,9 @@ Have some option that activates the following check set:
 | exp09  | Control E3, initialized from exp9end.
 | exp10  | Control E4, initialized from exp7end.
 | exp11  | Control E5, initialized from exp6end.
+| exp12  | As for exp03 but with tanh-masked smoothing
+| exp13  | As for exp07 but with tanh-masked smoothing
+
 ** Performance/scaling:
 OCN time step = 300 seconds
 ATM time step = 30 seconds
@@ -1909,10 +1918,10 @@ components of shflx (these are all calculated in WRF so not provided
 individually).
 
 ** Smoothing SST
-
+*** Initial setup (and IDL script for remapping):
 I need to:
-*** 1) Generate a remapping file rmp_ocnt_to_atmt_SMOOTH.nc file: 
-**** The rmp file details
+**** 1) Generate a remapping file rmp_ocnt_to_atmt_SMOOTH.nc file: 
+***** The rmp file details
 In the normal run, we use SCRIPR as an option in namcouple which
 automatically generates the default rmp_ocnt_to_atmt_DISTWGT.nc file.
 
@@ -1943,7 +1952,7 @@ The scrip code has a test function the uses your input remapping file
 to generate a source and destination array that is output as a netcdf
 file - so this will be useful for testing.
 
-**** Understanding Sebastien's IDL script: 
+***** Understanding Sebastien's IDL script: 
 
 Actually it might not be too hard, I think I only need to modify the
 "smooth atm values..." section to change the smoothing.
@@ -1965,7 +1974,7 @@ them.
 dmax -> Approximate distance in degrees between one atm point and its
 4 closest ocean neighbours.
 
-**** Setup and running Sebastien's IDL script:
+***** Setup and running Sebastien's IDL script:
 mkdir /g/data/e14/rmh561/croco/data/OASIS_FILES/PAC12_75_cpl/
 cd /g/data/e14/rmh561/croco/data/OASIS_FILES/PAC12_75_cpl/
 ln -s /g/data/e14/rmh561/croco/data/CROCO_FILES/PAC12_75/croco_grd_PAC12.nc croco_grd.nc
@@ -1985,7 +1994,7 @@ commands).
 
 Modified script to use a narrow Gaussian in y. This could probably be
 done much better. 
-*** 2) modify namcouple to use this file
+**** 2) modify namcouple to use this file
 TO do this, I just need to use a single transformation and the MAPPING
 keyword. E.g. I think for SST the following would work:
 
@@ -2014,12 +2023,12 @@ round-off error).
 Note: the masks.nc, grids.nc and areas.nc files are not needed when
 using a custom remapping file.
 
-*** 3) modify setup scripts to link in this remap file
+**** 3) modify setup scripts to link in this remap file
 I just added some code at the bottom of SCRIPTS_TOOLBOX/cpl_nam.sh to
 link all rmp*.nc files in $CWORK/OASIS_FILES (which itself is linked
 from scratch to gdata). 
-*** RANDOM NOTES:
-**** ACCESS-OM2
+**** RANDOM NOTES:
+***** ACCESS-OM2
 In access-om2, the namcouple contains minimal detailed because:
 
 - CICE and MOM use the same grid and same time-step, so no remapping
@@ -2034,6 +2043,48 @@ In access-om2, the namcouple contains minimal detailed because:
   used). 
 
 NOTE: we're not using conservative remapping for heat flux atm->ocn.
+
+*** Modifications for masking and python script (21/11/2022):
+
+There were a bunch of errors in the python script that Lionel sent
+me. This is a brief summary:
+1. Longitude cyclicity on atmospheric grid.
+2. Didn't deal with the case where the atmospheric point was right on
+   top of an oceanic point properly in "outside of ocean grid
+   weights".
+3. nn/2 was giving a float (X.5) when nn was an integer which shifted
+   things in the wrong direction in the smoothing. needed to use
+   int(nn/2) [which was implicit in IDL].
+4. Issues with the SST testing smooth at the bottom - needed to add
+   expand_dims.
+5. Some possible errors that Matthieu fixed in his version. I'm not
+   sure if these were neccessary.
+
+Note: There was no issue with C vs. F ordering.
+
+I fixed these. I also changed it to smooth only in the x-direction
+properly. I.e. with zero width in the y-direction (much more
+efficient).
+
+Finally, I introduced a mask for specifying the region over which
+smoothing is applied. Specifically, this takes a mask of float value
+between 0 and 1 on the atmospheric grid from a netcdf file and uses
+this coefficient to apply the appropriate fraction of the smoothing
+window or a window which does no smoothing (i.e. just a 1 at the
+central point).
+
+The script for making the smoothing mask is in Make_Smooth_Mask.ipynb.
+
+The script for testing the .py script is in build_weights_test.ipynb.
+
+The PBS submission script is in make_wgt_py.sub.
+
+After much dealing with bugs, I've got this working. See the last
+commit on:
+
+https://github.com/rmholmes/TropPacCROCO-WRF/tree/remapping_mask_x_developmenthttps://github.com/rmholmes/TropPacCROCO-WRF/tree/remapping_mask_x_development
+
+https://github.com/rmholmes/TropPacCROCO-WRF/commit/9f54fa07d7836e1eaeb0ffb81b75d35a8d8f8aa5https://github.com/rmholmes/TropPacCROCO-WRF/commit/9f54fa07d7836e1eaeb0ffb81b75d35a8d8f8aa5
 
 ** Ensembles
 
@@ -2137,7 +2188,7 @@ Using nccompress I'm getting a factor of about 57% with compression.
 *** TODO More comprehensive wind work and EKE/MKE analysis
 *** TODO BT/BC conversion terms and EKE budget in general
 *** TODO coupling coefficients (TC analysis)
-*** TODO atmospheric analysis - how far do the anomalies extend
+*** TODO atmospheric analysis - how far do the anomalies extend?
 *** TODO heat budget - to understand V'T' and disentangle TIWTV changes (direct or through enhanced stirring?)
 *** TODO Temperature variance budgets (TIWTV)?
 *** TODO Wavenumber spectra (take code from NumMix paper).
@@ -2148,57 +2199,6 @@ Using nccompress I'm getting a factor of about 57% with compression.
 *** TODO Some indication of vertical mixing changes in TFB/CFB runs.
 ** to-do list (mixing):
 *** TODO Add TAO obs once longer time period.
-*** TODO Quantify hanges in TIW modulation
+*** TODO Quantify changes in TIW modulation
 *** TODO Quantify rectification?
 *** TODO Understand the vertical structure results
-* Discussion with Sebastien 15/6/2022
-
-Validation:
-- Do comparison to TAO with proper times. It's interesting the
-  vertical structure at the surface. Is this real? How does it compare
-  with TAO? Is SODA actually really bad in having an eastward surface
-  velocity over this time period?
-- Compare winds between coupled and forced - are these responsible for
-the SST biases we see?
-
-- SSH variance bias is also very interesting, and confusing. Does this
-mean that the meridional velocity variance is also too weak in the
-same regions? (Do this). And/or how does the vertical structure of the
-TIWs compare to observations? If they're deeper/more barotropic then
-they might have a stronger surface signature?
-
-- Seasonal cycle dependence on WrF radiation and convection schemes -
-  they've tested a bunch of different options and they can change this
-  a lot. So might need to worry about this. And need to add these
-  details to the NCMAS app.
-
-Mixing/KPP:
-- Apparently the UCLA and Rutgers KPP versions are now quite
-different? He thought this stuff was quite interesting.
-
-Smoothing:
-- Looks really good and robust. However, the smoothing of the P-C
-upwelling region might be problematic - should probably restrict this
-to a smaller region?
-
-Heat fluxes:
-- Maybe the ERA-5 data assimpliation is killing the small scale
-structures? What is the resolution of ERA-5?
-- Sensible heat flux is because the TIW anomalies are out of phase in
-ERA-5 vs. CROCO. Interesting!
-
-Smooth-SST results:
-- Not clear that the La Nina thing is robust. Need to run
-ensembles. Start one from a year earlier in the spinup? Also, run it
-for one year longer!!
-- The most likely candidate is a change in the upwelling strength?
-Variations in winds drive variations in upwelling that impact the heat
-budget? 
-
-We didn't discuss the SST subsampling issue with the gaussian filter -
-but I really don't think it's an issue.
-
-
-
-
-
