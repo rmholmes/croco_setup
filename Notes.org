@@ -1594,7 +1594,7 @@ See 2014_Validation. Looks ok. I'm a bit worried about the deep
 EUC. This is also deeper than ACCESS-OM2-025 and ACCESS-OM2-01. Why?
 Too much mixing higher in the water column.
 
-The EUC magnitude looks consistent with other model solutions (SODA,
+The EUC magnitude looks consistent with other model solutions (SODA
 ACCESS-OM2) but about 50m deeper than in TAO.
 
 The NECC is much better than ACCESS-OM2. In fact, the profile of SSH
@@ -1672,8 +1672,12 @@ biases??).
 CROCO-WRF 1/12-degree simulation initialized from PAC12_75 CROCO-only
 run
 ** To-do list:
-**** TODO Rerun noTWB and noMesoscaleCFB simulations with masked smoothing.
+**** TODO Figure out hanging error and fix it!
+**** TODO Come up with a better way to keep track of executables with hashes (when I start doing more mixing runs)
+**** TODO Some issue with AVX in the broadwell nodes - I can't use them?
 **** TODO Figure out what SST is used in the Atlantic.
+**** DONE Rerun noTWB and noMesoscaleCFB simulations with masked smoothing.
+     CLOSED: [2022-11-30 Wed 15:58]
 **** DONE Figure out SST-smoothing remapping
      CLOSED: [2022-05-23 Mon 12:41]
 **** DONE Run a no current feedback simulation?
@@ -1686,8 +1690,6 @@ run
      CLOSED: [2022-11-21 Mon 13:48]
 **** DONE Tweak smoothing script to only smooth over a specified region
      CLOSED: [2022-11-21 Mon 13:48]
-**** TODO Come up with a better way to keep track of executables with hashes.
-**** TODO Some issue with AVX in the broadwell nodes - I can't use them?
 **** DONE Fix DIAGNOSTICS_EDDY and include eddy terms by default.
      CLOSED: [2022-06-29 Wed 17:10]
 **** DONE Write script to delete job and resubmit automatically when hanging
@@ -1727,20 +1729,31 @@ Have some option that activates the following check set:
 Note on branches: All general updates should be done on PAC12_75_cpl
 branch (kept up to date), this is effectively "main".
 | Name   | Description
-| exp01  | 2014 year 1 - note: Output linked into exp02.
-| exp02  | 2015-2018 production Control run (started from PAC12_75, exp10end)
-| exp03  | 2014+ smooth SST run (Gaussian longitude filter), started from exp10end
-| exp04  | Smooth-SST E2: As for exp03 except initialized from end of PAC12_75_exp08 (exp8end).
-| exp05  | PP81 mixing scheme (initialized from 2014), started from exp10end.
-| exp06  | No current feedback experiment - full, started from exp10end.
-| exp07  | No mesoscale current feedback - pass smoothed UOCE/VOCE toatmosphere, started from exp10end.
-| exp08  | Control E2, initialized from exp8end.
-| exp09  | Control E3, initialized from exp9end.
-| exp10  | Control E4, initialized from exp7end.
-| exp11  | Control E5, initialized from exp6end.
-| exp12  | As for exp03 but with tanh-masked smoothing
-| exp13  | As for exp07 but with tanh-masked smoothing
-
+| exp01  | 2014 Control year 1, started from exp10end      | DONE Output linked into exp02.
+| exp02  | 2015-2018 Control run                           | DONE
+| exp03  | 2014+ smooth SST run, started from exp10end     | DELETED
+| exp04  | exp03 E2: initialized from exp8end              | DELETED
+| exp05  | PP81 mixing, started from exp10end. TIW-output  | RUNNING 2015+... -0
+| exp06  | NoCFB, started from exp10end.                   | DONE
+| exp07  | NoMesoCFB, started from exp10end.               | DELETED
+| exp08  | Control E2, initialized from exp8end.           | DONE
+| exp09  | Control E3, initialized from exp9end. TIW-output| RERUNNING 2015+ with TIW-output -12.
+| exp10  | Control E4, initialized from exp7end.           | DONE
+| exp11  | Control E5, initialized from exp6end.           | DONE
+| exp12  | As for exp03 but with tanh-masked smoothing     | DONE
+| exp13  | As for exp07 but with tanh-masked smoothing     | DONE
+| exp14  | exp12 E2, initialized from exp8end.             | RUNNING 2015+ -3
+| exp15  | exp13 E2, initialized from exp8end.             | started 2014-2015 -4
+| exp16  | exp06 E2, initialized from exp8end.             | started 2014-2015 -5
+| exp17  | exp12 E3, initialized from exp9end. TIW-output  | RUNNING 2015+ -6
+| exp18  | exp13 E3, initialized from exp9end. TIW-output  | started 2014-2015 -7 - Add TIW-output
+| exp19  | exp06 E3, initialized from exp9end. TIW-output  | started 2014-2015 -8 - Add TIW-output
+| exp20  | exp12 E4, initialized from exp7end.             | started 2014-2015 -9
+| exp21  | exp13 E4, initialized from exp7end.             | started 2014-2015 -10
+| exp22  | exp06 E4, initialized from exp7end.             | started 2014-2015 -11
+| exp23  | exp12 E5, initialized from exp6end.             | PLANNED
+| exp24  | exp13 E5, initialized from exp6end.             | PLANNED
+| exp25  | exp06 E5, initialized from exp6end.             | PLANNED
 ** Performance/scaling:
 OCN time step = 300 seconds
 ATM time step = 30 seconds
@@ -2115,6 +2128,65 @@ atmosphere.
 exp07 setup to run with no mesoscale current feedback. This simply
 involves passing the smoothed UOCE/VOCE to the atmosphere. 
 
+** Analysis notes
+*** First look at new masked-smoothing runs 7/12/2022:
+- Yes, large mean state interhemispheric anomalies were an artifact of
+the smoothing of the P-C upwelling - it's much smaller in the new run
+(although similar sign).
+
+- Mean state changes are subtle. Need to confirm statistical
+significance before reading too much into them (hatch if the changes
+are the same sign compared to every control ensemble?).
+
+- NoCFB seems to have the largest/most coherent mean state changes
+with a large-scale cooling and large zonal current and SSH changes.
+
+- Significant changes in eddy wind work in all simulations - including
+smooth-SST.
+
+- Interesting changes in MKE and EKE - although more subtle.
+
+- Some interesting looking changes in equatorial temperature variance
+in the CFB experiments - if they're robust?
+
+- Big changes in SSH variance and v variance away from equator in CFB
+and NoMesoCFB.
+
+- Differences between NoMesoCFB and NoCFB seem even larger in the
+masked experiments - suggesting that the mean CFB effects are larger
+in these new experiments (not sure if this is statistically significant)?
+
+*** Heat budget analysis using Lisa's code
+
+Using Lisa's Tracer_balance_code_LMaillard_v2;
+
+need intel compilers loaded:
+module load intel-compiler/2021.7.0
+
+then do "make clean", "make".
+
+In python3: 
+import R_tools_fort as toolsF
+
+get_tracer_evolution.F requires the following inputs:
+Lm,Mm, N, pm, pn, 
+u, v, z_r, z_w, dt, t, stflx, srflx, ghat, swr_frac, W, AkT.
+
+Need to investigate:
+swr_frac: need Hz.
+ghat: stflx, srflx, hbl, swr_frac, alpha, beta.
+Hz: probably fine
+stflx: probably fine
+srflx: probably fine
+alpha, beta: alfabeta.F using rh0, t, s.
+W: Yes this is omega. Can get it using get_omega from u and v if needed. 
+
+So I think I have everything I need.
+
+I won't capture sub-daily correlations between T and V, of course. Not
+sure how important this is, but if I'm only trying to get the TIW eddy
+contributions that's not really a problem?
+
 * PAC12_75_wrf - WRF only
 Setup a WRF-only configuration initially just for scaling
 calculations, but could be useful later on...
@@ -2185,18 +2257,22 @@ Best configuration:
 Using nccompress I'm getting a factor of about 57% with compression.
 * Analysis 
 ** to-do list (coupled):
-*** TODO More comprehensive wind work and EKE/MKE analysis
+*** DONE More comprehensive wind work and EKE/MKE analysis
+    CLOSED: [2022-12-09 Fri 17:13]
 *** TODO BT/BC conversion terms and EKE budget in general
 *** TODO coupling coefficients (TC analysis)
 *** TODO atmospheric analysis - how far do the anomalies extend?
 *** TODO heat budget - to understand V'T' and disentangle TIWTV changes (direct or through enhanced stirring?)
 *** TODO Temperature variance budgets (TIWTV)?
-*** TODO Wavenumber spectra (take code from NumMix paper).
 *** TODO Better understand SSH variance results - What about vertical structure?
-*** TODO Plot net LW flux from coupled simulations?
-*** TODO Compare different reanalyses: ORAS5, SODA and Glorys.
-*** TODO T-lat space budgets?
 *** TODO Some indication of vertical mixing changes in TFB/CFB runs.
+*** DONE Statistical significance plots
+    CLOSED: [2022-12-09 Fri 17:13]
+*** DONE Plot net LW flux from coupled simulations?
+    CLOSED: [2022-12-09 Fri 17:14]
+*** TODO Compare different reanalyses: ORAS5, SODA and Glorys.
+*** TODO Wavenumber spectra (take code from NumMix paper) - 
+*** TODO T-lat space budgets?
 ** to-do list (mixing):
 *** TODO Add TAO obs once longer time period.
 *** TODO Quantify changes in TIW modulation
