@@ -1730,30 +1730,30 @@ Note on branches: All general updates should be done on PAC12_75_cpl
 branch (kept up to date), this is effectively "main".
 | Name   | Description
 | exp01  | 2014 Control year 1, started from exp10end      | DONE Output linked into exp02.
-| exp02  | 2015-2018 Control run                           | DONE
+| exp02  | 2015-2018 Control run f                         | DONE
 | exp03  | 2014+ smooth SST run, started from exp10end     | DELETED
 | exp04  | exp03 E2: initialized from exp8end              | DELETED
-| exp05  | PP81 mixing, started from exp10end. TIW-output  | RUNNING 2015+... -0
+| exp05  | PP81 mixing, started from exp10end. TIW-output  | DONE
 | exp06  | NoCFB, started from exp10end.                   | DONE
 | exp07  | NoMesoCFB, started from exp10end.               | DELETED
 | exp08  | Control E2, initialized from exp8end.           | DONE
-| exp09  | Control E3, initialized from exp9end. TIW-output| RERUNNING 2015+ with TIW-output -12.
+| exp09  | Control E3, initialized from exp9end. TIW-output| DONE
 | exp10  | Control E4, initialized from exp7end.           | DONE
 | exp11  | Control E5, initialized from exp6end.           | DONE
 | exp12  | As for exp03 but with tanh-masked smoothing     | DONE
 | exp13  | As for exp07 but with tanh-masked smoothing     | DONE
-| exp14  | exp12 E2, initialized from exp8end.             | RUNNING 2015+ -3
-| exp15  | exp13 E2, initialized from exp8end.             | started 2014-2015 -4
-| exp16  | exp06 E2, initialized from exp8end.             | started 2014-2015 -5
-| exp17  | exp12 E3, initialized from exp9end. TIW-output  | RUNNING 2015+ -6
-| exp18  | exp13 E3, initialized from exp9end. TIW-output  | started 2014-2015 -7 - Add TIW-output
-| exp19  | exp06 E3, initialized from exp9end. TIW-output  | started 2014-2015 -8 - Add TIW-output
-| exp20  | exp12 E4, initialized from exp7end.             | started 2014-2015 -9
-| exp21  | exp13 E4, initialized from exp7end.             | started 2014-2015 -10
-| exp22  | exp06 E4, initialized from exp7end.             | started 2014-2015 -11
-| exp23  | exp12 E5, initialized from exp6end.             | PLANNED
-| exp24  | exp13 E5, initialized from exp6end.             | PLANNED
-| exp25  | exp06 E5, initialized from exp6end.             | PLANNED
+| exp14  | exp12 E2, initialized from exp8end.             | DONE
+| exp15  | exp13 E2, initialized from exp8end.             | DONE
+| exp16  | exp06 E2, initialized from exp8end.             | DONE
+| exp17  | exp12 E3, initialized from exp9end. TIW-output  | DONE
+| exp18  | exp13 E3, initialized from exp9end. TIW-output  | DONE
+| exp19  | exp06 E3, initialized from exp9end. TIW-output  | DONE
+| exp20  | exp12 E4, initialized from exp7end.             | DONE - SYNCING
+| exp21  | exp13 E4, initialized from exp7end.             | DONE
+| exp22  | exp06 E4, initialized from exp7end.             | RUNNING au06 2015+ -11 2016-9
+| exp23  | exp12 E5, initialized from exp6end.             | RUNNING au06 2015+ -13 2016-3
+| exp24  | exp13 E5, initialized from exp6end.             | DONE
+| exp25  | exp06 E5, initialized from exp6end.             | DONE
 ** Performance/scaling:
 OCN time step = 300 seconds
 ATM time step = 30 seconds
