@@ -1734,7 +1734,7 @@ branch (kept up to date), this is effectively "main".
 | exp03  | 2014+ smooth SST run, started from exp10end     | DELETED
 | exp04  | exp03 E2: initialized from exp8end              | DELETED
 | exp05  | PP81 mixing, started from exp10end. TIW-output  | DONE
-| exp06  | NoCFB, started from exp10end.                   | DONE
+| exp06  | NoCFB, started from exp10end.                   | DELETED
 | exp07  | NoMesoCFB, started from exp10end.               | DELETED
 | exp08  | Control E2, initialized from exp8end.           | DONE
 | exp09  | Control E3, initialized from exp9end. TIW-output| DONE
@@ -1744,16 +1744,39 @@ branch (kept up to date), this is effectively "main".
 | exp13  | As for exp07 but with tanh-masked smoothing     | DONE
 | exp14  | exp12 E2, initialized from exp8end.             | DONE
 | exp15  | exp13 E2, initialized from exp8end.             | DONE
-| exp16  | exp06 E2, initialized from exp8end.             | DONE
+| exp16  | exp06 E2, initialized from exp8end.             | DELETED
 | exp17  | exp12 E3, initialized from exp9end. TIW-output  | DONE
 | exp18  | exp13 E3, initialized from exp9end. TIW-output  | DONE
-| exp19  | exp06 E3, initialized from exp9end. TIW-output  | DONE
-| exp20  | exp12 E4, initialized from exp7end.             | DONE - SYNCING
+| exp19  | exp06 E3, initialized from exp9end. TIW-output  | DELETED
+| exp20  | exp12 E4, initialized from exp7end.             | DONE
 | exp21  | exp13 E4, initialized from exp7end.             | DONE
-| exp22  | exp06 E4, initialized from exp7end.             | RUNNING au06 2015+ -11 2016-9
-| exp23  | exp12 E5, initialized from exp6end.             | RUNNING au06 2015+ -13 2016-3
+| exp22  | exp06 E4, initialized from exp7end.             | DELETED
+| exp23  | exp12 E5, initialized from exp6end. TIW-output  | DONE
 | exp24  | exp13 E5, initialized from exp6end.             | DONE
-| exp25  | exp06 E5, initialized from exp6end.             | DONE
+| exp25  | exp06 E5, initialized from exp6end.             | DELETED
+| exp26  | NoCFB-TIW. from exp10end            TIW-outputW | DONE
+| exp27  | NoCFB-TIW. from exp8end                         | DONE
+| exp28  | NoCFB-TIW. from exp9end                         | DONE
+| exp29  | NoCFB-TIW. from exp7end                         | DONE
+| exp30  | NoCFB-TIW. from exp6end                         | DONE
+| exp09rr| re-run 2015+ with TIW-outputF                   | -3 RUNNING
+| exp17rr| re-run 2015+ with TIW-outputF                   | -0 RUNNING
+| exp18rr| re-run 2015+ with TIW-outputF                   | -4 RUNNING
+| exp26rr| re-run 2015+ with TIW-outputF                   | -2 RUNNING
+TIW-outputW has updated output to include the vertical velocity and
+omega.
+
+TIW-outputF will be updated to include full-depth output (needed for
+heat budget). To do this I want to rerun:
+exp09 2015+: Control
+exp17 2015+: NoTFB
+exp18 2015+: NoMesoCFB
+exp26 2015+: NoCFB
+
+Possible deletions (22/3/2023):
+Keeping hourly WRF data from 2014 just in case I want to run an
+ocean-only (could probably do this for only one ensemble).
+
 ** Performance/scaling:
 OCN time step = 300 seconds
 ATM time step = 30 seconds
@@ -1908,7 +1931,7 @@ cd CROCO_IN/
 ./jobcomp > jobcomp.log
 
 WRF:
-cd /g/data/e14/rmh561/croco/src/WRF/
+cd /g/data/e14/rmh561/croco/src/WRF/WRF/
 Update paths in configure.wrf
 ./run_compile
 
@@ -2128,6 +2151,56 @@ atmosphere.
 exp07 setup to run with no mesoscale current feedback. This simply
 involves passing the smoothed UOCE/VOCE to the atmosphere. 
 
+CPLMASK WRF modifications so that NoCFB is applied only over TIW
+region: I need to basically input to versions of CPLMASK into the
+cpl_rcv_sfcdrv routine in frames/module_cpl.F in the WRF code. This is
+called from phys/module_surface_driver.F, which is called from
+dyn_em/module_first_rk_step_part1.F, which contains input
+CPLMASK=grid%cplmask.
+
+There is also a bunch of mentions in the 'alloc' files in frame/ - is
+this where they are read in? 
+
+Also in the 'alloc.inc' files in inc/, but these are all automatically
+generated from a Registry.
+
+The Registry is in Registry/Registry.EM_COMMON
+
+After doing a "./clean -a", I need to modify:
+- cpl_rcv_sfcdrv in frames/module_cpl.F - DONE
+- phys/module_surface_driver.F          - DONE
+- dyn_em_module_first_rk_step_part1.F   - DONE
+- Registry/Registry.EM_COMMON           - DONE
+
+To recompile just did ./run_compile in this directory. This worked,
+and I copied the executables into exes/coupled_cplmasku (use this for
+a new NoCFB run).
+
+Modifying the actual CPLMASK:
+These are in the first (2014-01) wrfinput file as CPLMASK. So I just
+need to add a CPLMASKU which has the masking I want. I
+then use these executables for the NoCFB run, and the original
+executables if not. I think I should probably do this once and check
+if  makes a big difference.
+
+Make_Smooth_Mask.ipynb modified to make the new input file. It's
+really big (52GB) because of netcdf compression. But continuing
+anyway...
+
+Rerunning costs:
+For full NoCFB:
+1 member = 5*22 = 110kSU
+5 members = 550kSU
+
+For TIW output section of Control, NoTFB, NoMesoCFB and NoCFB:
+4*4*22 = 352kSU
+
+Total = 814kSU. So I have it, but not by that much.
+
+Would be worth doing one member of NoCFB without TIWoutput to check
+differences anyway.
+
+
 ** Analysis notes
 *** First look at new masked-smoothing runs 7/12/2022:
 - Yes, large mean state interhemispheric anomalies were an artifact of
@@ -2161,7 +2234,12 @@ in these new experiments (not sure if this is statistically significant)?
 Using Lisa's Tracer_balance_code_LMaillard_v2;
 
 need intel compilers loaded:
-module load intel-compiler/2021.7.0
+module load intel-compiler
+
+Edit R_tools_fort.F to turn on the functions that you want (note: not
+all of them compile successfully. E.g. rho_eos (but rho_eos1 works). I
+had to activate #define DUKO_2001 in cppdefs.h to get make_buoy
+working).
 
 then do "make clean", "make".
 
@@ -2186,6 +2264,29 @@ So I think I have everything I need.
 I won't capture sub-daily correlations between T and V, of course. Not
 sure how important this is, but if I'm only trying to get the TIW eddy
 contributions that's not really a problem?
+
+Problem: I think the TS_VADV_SPLINES routine does an integral from the
+bottom up. So I would need the full vertical column of output to do
+everything properly. Rerun?
+
+*** EKE budget:
+
+From Holmes et al. 2016 I would need the friction and pressure
+gradient operators to completely close the budget. I don't think I
+really need to do this. 
+
+Just look at BT and BC energy conversion sources:
+u'u' dU/dx
+u'v' dU/dy
+u'w' dU/dz
+v'v' dV/dy
+u'v' dV/dx
+u'w' dV/dz
+w'b'
+And the wind works which I've already calculated.
+
+So need to calculate b using the EOS. Should be in Lisa's code, but
+doesn't seem to be in the module at the moment. Need to look into that...
 
 * PAC12_75_wrf - WRF only
 Setup a WRF-only configuration initially just for scaling
