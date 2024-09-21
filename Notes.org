@@ -58,6 +58,7 @@ make_bry:
 make_ini:
         to make the initial conditions.
 
+
 # Compilation:
 Edit jobcomp if needed (shouldn't be needed).
 To compile, do (creates croco executable):
@@ -1733,11 +1734,11 @@ branch (kept up to date), this is effectively "main".
 | exp02  | 2015-2018 Control run f                         | DONE
 | exp03  | 2014+ smooth SST run, started from exp10end     | DELETED
 | exp04  | exp03 E2: initialized from exp8end              | DELETED
-| exp05  | PP81 mixing, started from exp10end. TIW-output  | DONE
+| exp05  | PP81 mixing, started from exp10end. TIW-outputF | DONE
 | exp06  | NoCFB, started from exp10end.                   | DELETED
 | exp07  | NoMesoCFB, started from exp10end.               | DELETED
 | exp08  | Control E2, initialized from exp8end.           | DONE
-| exp09  | Control E3, initialized from exp9end. TIW-output| DONE
+| exp09  | Control E3, initialized from exp9end.TIW-outputF| DONE
 | exp10  | Control E4, initialized from exp7end.           | DONE
 | exp11  | Control E5, initialized from exp6end.           | DONE
 | exp12  | As for exp03 but with tanh-masked smoothing     | DONE
@@ -1745,33 +1746,25 @@ branch (kept up to date), this is effectively "main".
 | exp14  | exp12 E2, initialized from exp8end.             | DONE
 | exp15  | exp13 E2, initialized from exp8end.             | DONE
 | exp16  | exp06 E2, initialized from exp8end.             | DELETED
-| exp17  | exp12 E3, initialized from exp9end. TIW-output  | DONE
-| exp18  | exp13 E3, initialized from exp9end. TIW-output  | DONE
+| exp17  | exp12 E3, initialized from exp9end. TIW-outputF | DONE
+| exp18  | exp13 E3, initialized from exp9end. TIW-outputF | DONE
 | exp19  | exp06 E3, initialized from exp9end. TIW-output  | DELETED
 | exp20  | exp12 E4, initialized from exp7end.             | DONE
 | exp21  | exp13 E4, initialized from exp7end.             | DONE
 | exp22  | exp06 E4, initialized from exp7end.             | DELETED
-| exp23  | exp12 E5, initialized from exp6end. TIW-output  | DONE
+| exp23  | exp12 E5, initialized from exp6end.             | DONE
 | exp24  | exp13 E5, initialized from exp6end.             | DONE
 | exp25  | exp06 E5, initialized from exp6end.             | DELETED
-| exp26  | NoCFB-TIW. from exp10end            TIW-outputW | DONE
+| exp26  | NoCFB-TIW. from exp10end            TIW-outputF | DONE
 | exp27  | NoCFB-TIW. from exp8end                         | DONE
 | exp28  | NoCFB-TIW. from exp9end                         | DONE
 | exp29  | NoCFB-TIW. from exp7end                         | DONE
 | exp30  | NoCFB-TIW. from exp6end                         | DONE
-| exp09rr| re-run 2015+ with TIW-outputF                   | -3 RUNNING
-| exp17rr| re-run 2015+ with TIW-outputF                   | -0 RUNNING
-| exp18rr| re-run 2015+ with TIW-outputF                   | -4 RUNNING
-| exp26rr| re-run 2015+ with TIW-outputF                   | -2 RUNNING
 TIW-outputW has updated output to include the vertical velocity and
 omega.
 
-TIW-outputF will be updated to include full-depth output (needed for
-heat budget). To do this I want to rerun:
-exp09 2015+: Control
-exp17 2015+: NoTFB
-exp18 2015+: NoMesoCFB
-exp26 2015+: NoCFB
+TIW-outputF has updated output to include full-depth output (needed for
+heat budget).
 
 Possible deletions (22/3/2023):
 Keeping hourly WRF data from 2014 just in case I want to run an
@@ -2267,7 +2260,41 @@ contributions that's not really a problem?
 
 Problem: I think the TS_VADV_SPLINES routine does an integral from the
 bottom up. So I would need the full vertical column of output to do
-everything properly. Rerun?
+everything properly. Rerunning because of this...
+
+**** Lisa's instructions 21/3/2023:
+
+Ok, I remember your spatial Gaussian filter. So you want to perform a
+reynolds decomposition on the advective terms (u*T = u'*T' + u_m*T_m +
+cross terms), is that correct ?
+
+The vertical advective term of the heat budget computed in CROCO is
+using omega and not the true velocity w. So to compute the vertical
+and horizontal advective terms, you will need daily u,v, temp, zeta
+and omega (but you can also compute omega offline). Then you can call
+the following functions:
+
+[zr,zw] = toolsF.zlevs(h,zeta, hc, Cs_r,Cs_w)
+omega = toolsF.get_omega(u,v,zr,zw,pm,pn)  # --> only if you don't have omega
+TXadv,TYadv,TVadv = toolsF.get_tracer_evolution_adv2(u,v,zr,zw,pm,pn,dt_model,t,omega)
+
+If you already saved daily u,v,temp,omega on the upper part of the
+water column, you might be able to compute the advective terms, but I
+am really not sure about that as the zlevs and
+get_tracer_evolution_adv2 may need the entire water column as
+well. Otherwise, you will need to re-run the model to save them on the
+entire water column.
+
+Just a quick note on the python-to-fortran codes to compute the heat
+advection: Once you have all the daily outputs you need, and you are
+ready to compute the advective terms of the heat budget, you will need
+to chose either the transport form (uT) or the advective form
+(u*dT/dx). I think the code "get_tracer_evolution_adv2" that I gave
+you is designed to give the advective form. If you want the transport
+form, you just need to comment the lines 150 to 164 (starting from "!
+put in advection instead of flux : udx(tracer) instead of
+dx(u*tracer)").
+
 
 *** EKE budget:
 
@@ -2379,3 +2406,8 @@ Using nccompress I'm getting a factor of about 57% with compression.
 *** TODO Quantify changes in TIW modulation
 *** TODO Quantify rectification?
 *** TODO Understand the vertical structure results
+
+* Data removal after publishing (19/9/2024):
+Input data:
+- Deleted everything in /g/data/e14/rmh561/croco/data/DATA/ERA5_PAC12_75 and ../SODA342_PAC12_75 since it can all be regenerated following instructions above (search SODA 3.4.2 ini and bry processing and ERA5 forcing just below it above).
+- Deleted all boundary files in /g/data/e14/rmh561/croco/CROCO_FILES/*. Kept all the initial conditions files for the ensembles.
